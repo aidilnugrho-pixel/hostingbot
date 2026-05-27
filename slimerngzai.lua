@@ -203,7 +203,7 @@ task.spawn(function()
     end
 end)
 
--- ========== AUTO UPGRADE (DELAY 0.1) ==========
+-- ========== AUTO UPGRADE (DELAY 1 DETIK) ==========
 local function upgrade()
     if not upgradeRemote then return end
     local pg = localPlayer:FindFirstChild("PlayerGui")
@@ -223,6 +223,7 @@ local function upgrade()
                                     pcall(function()
                                         upgradeRemote:InvokeServer("requestUnlock", upgradeName)
                                     end)
+                                    task.wait(0.1)
                                 end
                             end
                         end
@@ -259,7 +260,7 @@ task.spawn(function()
     end
 end)
 
--- ========== AUTO BUY + BEST ZONE (BUY DULU, BARU TP) ==========
+-- ========== AUTO BUY + BEST ZONE (FIX - BELI DULU BARU TP) ==========
 
 -- Cek zona terbaik yang sudah terbuka
 local function getBestOpenZone()
@@ -317,7 +318,7 @@ local function tryBuyZone()
     return true
 end
 
--- Teleport ke best zone
+-- Teleport ke best zone (zona terbuka tertinggi)
 local function tryTeleportToBestZone()
     if not zonesRemote then return false end
     
@@ -341,9 +342,15 @@ end
 task.spawn(function()
     while true do
         if autoBuyZoneActive then
+            -- Cek zona terbaik saat ini
+            local currentBest = getBestOpenZone()
+            
+            -- Beli zona dulu
             local bought = tryBuyZone()
+            
             if bought then
                 task.wait(1)
+                -- Setelah beli, teleport ke zona terbaik (yang baru)
                 tryTeleportToBestZone()
             end
         end
@@ -412,8 +419,8 @@ screenGui.ResetOnSpawn = false
 screenGui.Parent = localPlayer:WaitForChild("PlayerGui")
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 300, 0, 480)
-frame.Position = UDim2.new(0.5, -150, 0.5, -240)
+frame.Size = UDim2.new(0, 340, 0, 520)
+frame.Position = UDim2.new(0.5, -170, 0.5, -260)
 frame.BackgroundColor3 = Color3.fromRGB(10, 10, 20)
 frame.BackgroundTransparency = 0.15
 frame.BorderSizePixel = 0
@@ -451,7 +458,7 @@ local colorGradient = {
 }
 
 local strips = {}
-for i = 1, 24 do
+for i = 1, 26 do
     local strip = Instance.new("Frame")
     strip.Size = UDim2.new(1, 0, 0, 5)
     strip.BackgroundColor3 = colorGradient[(i % #colorGradient) + 1]
@@ -477,7 +484,7 @@ task.spawn(function()
     end
 end)
 
--- ========== TITLE BAR (3 BARIS) ==========
+-- ========== TITLE BAR ==========
 local titleBar = Instance.new("Frame")
 titleBar.Size = UDim2.new(1, 0, 0, 60)
 titleBar.BackgroundColor3 = Color3.fromRGB(20, 18, 35)
@@ -506,9 +513,9 @@ task.spawn(function()
     end
 end)
 
--- Baris 1: ZAIXPLOIT
+-- Baris 1 Kiri: ZAIXPLOIT
 local titleText = Instance.new("TextLabel")
-titleText.Size = UDim2.new(1, -80, 0, 18)
+titleText.Size = UDim2.new(0.5, 0, 0, 18)
 titleText.Position = UDim2.new(0, 28, 0, 6)
 titleText.BackgroundTransparency = 1
 titleText.Text = "ZAIXPLOIT"
@@ -518,10 +525,22 @@ titleText.TextSize = 14
 titleText.TextXAlignment = Enum.TextXAlignment.Left
 titleText.Parent = titleBar
 
--- Baris 2: SLIME RNG
+-- Baris 1 Kanan: Nickname
+local nickText = Instance.new("TextLabel")
+nickText.Size = UDim2.new(0.5, -50, 0, 18)
+nickText.Position = UDim2.new(0.5, 0, 0, 6)
+nickText.BackgroundTransparency = 1
+nickText.Text = localPlayer.DisplayName
+nickText.TextColor3 = Color3.fromRGB(200, 200, 255)
+nickText.Font = Enum.Font.FredokaOne
+nickText.TextSize = 12
+nickText.TextXAlignment = Enum.TextXAlignment.Right
+nickText.Parent = titleBar
+
+-- Baris 2 Kiri: SLIME RNG
 local subTitleText = Instance.new("TextLabel")
-subTitleText.Size = UDim2.new(1, -80, 0, 12)
-subTitleText.Position = UDim2.new(0, 28, 0, 24)
+subTitleText.Size = UDim2.new(0.5, 0, 0, 12)
+subTitleText.Position = UDim2.new(0, 28, 0, 26)
 subTitleText.BackgroundTransparency = 1
 subTitleText.Text = "SLIME RNG"
 subTitleText.TextColor3 = Color3.fromRGB(0, 200, 255)
@@ -530,17 +549,17 @@ subTitleText.TextSize = 10
 subTitleText.TextXAlignment = Enum.TextXAlignment.Left
 subTitleText.Parent = titleBar
 
--- Baris 3: Nama Display | Username
-local infoText = Instance.new("TextLabel")
-infoText.Size = UDim2.new(1, -80, 0, 12)
-infoText.Position = UDim2.new(0, 28, 0, 40)
-infoText.BackgroundTransparency = 1
-infoText.Text = localPlayer.DisplayName .. " | " .. localPlayer.Name
-infoText.TextColor3 = Color3.fromRGB(150, 150, 200)
-infoText.Font = Enum.Font.FredokaOne
-infoText.TextSize = 8
-infoText.TextXAlignment = Enum.TextXAlignment.Left
-infoText.Parent = titleBar
+-- Baris 2 Kanan: Username
+local userText = Instance.new("TextLabel")
+userText.Size = UDim2.new(0.5, -50, 0, 12)
+userText.Position = UDim2.new(0.5, 0, 0, 26)
+userText.BackgroundTransparency = 1
+userText.Text = localPlayer.Name
+userText.TextColor3 = Color3.fromRGB(150, 150, 200)
+userText.Font = Enum.Font.FredokaOne
+userText.TextSize = 9
+userText.TextXAlignment = Enum.TextXAlignment.Right
+userText.Parent = titleBar
 
 -- MINIMIZE BUTTON
 local minBtn = Instance.new("TextButton")
@@ -575,11 +594,22 @@ contentLayout.SortOrder = Enum.SortOrder.LayoutOrder
 contentLayout.Parent = contentScroll
 
 local padding = Instance.new("UIPadding")
-padding.PaddingLeft = UDim.new(0, 12)
-padding.PaddingRight = UDim.new(0, 12)
+padding.PaddingLeft = UDim.new(0, 15)
+padding.PaddingRight = UDim.new(0, 15)
 padding.PaddingTop = UDim.new(0, 8)
 padding.PaddingBottom = UDim.new(0, 8)
 padding.Parent = contentScroll
+
+-- ========== FUNGSI MEMBUAT GARIS ==========
+local function addSeparator(parent)
+    local line = Instance.new("Frame")
+    line.Size = UDim2.new(1, 0, 0, 1)
+    line.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
+    line.BackgroundTransparency = 0.7
+    line.BorderSizePixel = 0
+    line.Parent = parent
+    return line
+end
 
 -- ========== FUNGSI TOGGLE ==========
 local function createToggle(parent, text, emoji, getState, setState)
@@ -635,7 +665,10 @@ end
 
 -- ========== MEMBUAT UI ==========
 createToggle(contentScroll, "Auto Gun", "🔫", function() return autoGunActive end, function(v) autoGunActive = v end)
+addSeparator(contentScroll)
+
 createToggle(contentScroll, "Auto Roll", "🎲", function() return autoRollActive end, function(v) autoRollActive = v end)
+addSeparator(contentScroll)
 
 -- Utility Section Title
 local utilTitle = Instance.new("TextLabel")
@@ -651,9 +684,9 @@ utilTitle.Parent = contentScroll
 createToggle(contentScroll, "Auto Index", "📊", function() return autoIndexActive end, function(v) autoIndexActive = v end)
 createToggle(contentScroll, "Auto Farm Loot", "💰", function() return autoFarmLootActive end, function(v) autoFarmLootActive = v end)
 createToggle(contentScroll, "Auto Farm Fruit", "🍎", function() return autoFarmFruitActive end, function(v) autoFarmFruitActive = v end)
-createToggle(contentScroll, "Auto Upgrade", "⬆️", function() return autoUpgradeActive end, function(v) autoUpgradeActive = v end)
 createToggle(contentScroll, "Auto Rebirth", "🔄", function() return autoRebirthActive end, function(v) autoRebirthActive = v end)
 createToggle(contentScroll, "Auto Buy + Best Zone", "🏪", function() return autoBuyZoneActive end, function(v) autoBuyZoneActive = v end)
+addSeparator(contentScroll)
 
 -- Potion Section Title
 local potTitle = Instance.new("TextLabel")
@@ -670,6 +703,7 @@ createToggle(contentScroll, "Luck Potion", "🍀", function() return autoLuckAct
 createToggle(contentScroll, "Ultra Luck Potion", "⭐", function() return autoUltraLuckActive end, function(v) autoUltraLuckActive = v end)
 createToggle(contentScroll, "Currency Potion", "💵", function() return autoCurrencyActive end, function(v) autoCurrencyActive = v end)
 createToggle(contentScroll, "Roll Speed Potion", "⚡", function() return autoRollSpeedActive end, function(v) autoRollSpeedActive = v end)
+addSeparator(contentScroll)
 
 -- Zone Status
 local zoneStatus = Instance.new("TextLabel")
@@ -704,12 +738,12 @@ end)
 minBtn.MouseButton1Click:Connect(function()
     isMinimized = not isMinimized
     if isMinimized then
-        frame.Size = UDim2.new(0, 300, 0, 60)
+        frame.Size = UDim2.new(0, 340, 0, 60)
         contentScroll.Visible = false
         sideLamp.Visible = false
         minBtn.Text = "+"
     else
-        frame.Size = UDim2.new(0, 300, 0, 480)
+        frame.Size = UDim2.new(0, 340, 0, 520)
         contentScroll.Visible = true
         sideLamp.Visible = true
         minBtn.Text = "−"
@@ -720,10 +754,11 @@ print("════════════════════════�
 print("   ZAIXPLOIT | SLIME RNG - FINAL")
 print("═══════════════════════════════════════════")
 print("✅ AUTO GUN (0.033s) | AUTO ROLL (0.033s)")
-print("✅ AUTO INDEX (5s) | AUTO POTION (1s)")
-print("✅ AUTO FARM LOOT & FRUIT (0.5s)")
-print("✅ AUTO BUY ZONE (BELI DULU, BARU TP)")
+print("✅ AUTO INDEX (5s) | AUTO UPGRADE (1s)")
+print("✅ AUTO POTION (1s) | AUTO FARM (0.5s)")
+print("✅ AUTO BUY ZONE (BUY DULU, BARU TP)")
 print("✅ SIDE LAMP GRADIENT BERJALAN (FULL)")
+print("✅ GARIS PEMISAH ANTAR SECTION")
 print("✅ ANTI AFK + DELETE AUTOREJOIN")
 print("🚀 SCRIPT SIAP DIGUNAKAN")
 print("═══════════════════════════════════════════")
