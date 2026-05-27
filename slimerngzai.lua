@@ -12,6 +12,7 @@ local RollDelay = 0.1
 
 local AutoIndex = false
 local AutoFarmLoot = false
+local AutoFarmFruit = false
 local AutoUpgrade = false
 local AutoRebirth = false
 local AutoBuyZone = false
@@ -76,6 +77,49 @@ local function PullLoot()
                 end
             end
         end
+    end
+end
+
+local function GetAllFruits()
+    local fruits = {}
+    local locations = {
+        workspace:FindFirstChild("DroppedFruits"),
+        workspace:FindFirstChild("Fruits"),
+        workspace:FindFirstChild("Loot"),
+        workspace:FindFirstChild("Drops")
+    }
+    for _, loc in pairs(locations) do
+        if loc then
+            for _, child in pairs(loc:GetChildren()) do
+                if child:IsA("Model") or child:IsA("BasePart") then
+                    table.insert(fruits, child)
+                end
+            end
+        end
+    end
+    return fruits
+end
+
+local function GetFruitId(fruit)
+    local id = fruit:GetAttribute("LootId") or fruit:GetAttribute("Id") or fruit:GetAttribute("UUID")
+    if not id and #fruit.Name == 36 then id = fruit.Name end
+    if not id and fruit:FindFirstChild("Value") then id = fruit.Value.Value end
+    return id
+end
+
+local function ClaimFruit(fruitId)
+    if not LootSvc then return end
+    pcall(function() LootSvc:InvokeServer("requestCollect", fruitId) end)
+end
+
+local function AutoCollectFruit()
+    local fruits = GetAllFruits()
+    for _, fruit in pairs(fruits) do
+        local id = GetFruitId(fruit)
+        if id then
+            ClaimFruit(id)
+        end
+        task.wait(0.1)
     end
 end
 
@@ -200,6 +244,7 @@ end)
 
 task.spawn(function() while true do if AutoIndex then ClaimIndex() end task.wait(5) end end)
 task.spawn(function() while true do if AutoFarmLoot then PullLoot() end task.wait(0.5) end end)
+task.spawn(function() while true do if AutoFarmFruit then AutoCollectFruit() end task.wait(0.5) end end)
 task.spawn(function() while true do if AutoUpgrade then Upgrade() end task.wait(1) end end)
 task.spawn(function() while true do if AutoRebirth then Rebirth() end task.wait(5) end end)
 task.spawn(function() while true do if AutoBuyZone then BuyZoneAndTeleport() end task.wait(30) end end)
@@ -243,8 +288,8 @@ GUI.ResetOnSpawn = false
 GUI.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
 local Main = Instance.new("Frame")
-Main.Size = UDim2.new(0, 210, 0, 320)
-Main.Position = UDim2.new(0.5, -105, 0.5, -160)
+Main.Size = UDim2.new(0, 230, 0, 340)
+Main.Position = UDim2.new(0.5, -115, 0.5, -170)
 Main.BackgroundColor3 = Color3.fromRGB(8, 6, 15)
 Main.BackgroundTransparency = 0.05
 Main.BorderSizePixel = 0
@@ -298,7 +343,7 @@ local NeonColors = {
 }
 
 local Strips = {}
-for i = 1, 40 do
+for i = 1, 45 do
     local Strip = Instance.new("Frame")
     Strip.Size = UDim2.new(1, 0, 0, 8)
     Strip.BackgroundColor3 = NeonColors[1]
@@ -582,6 +627,7 @@ MakeSep(Scroll)
 MakeTitle(Scroll, "📦 AUTO UTILITY")
 MakeToggle(Scroll, "Auto Index", "📊", function() return AutoIndex end, function(v) AutoIndex = v end)
 MakeToggle(Scroll, "Auto Farm Loot", "💰", function() return AutoFarmLoot end, function(v) AutoFarmLoot = v end)
+MakeToggle(Scroll, "Auto Farm Fruit", "🍎", function() return AutoFarmFruit end, function(v) AutoFarmFruit = v end)
 MakeToggle(Scroll, "Auto Upgrade", "⬆️", function() return AutoUpgrade end, function(v) AutoUpgrade = v end)
 MakeToggle(Scroll, "Auto Rebirth", "🔄", function() return AutoRebirth end, function(v) AutoRebirth = v end)
 MakeToggle(Scroll, "Auto Buy Zone", "🏪", function() return AutoBuyZone end, function(v) AutoBuyZone = v end)
@@ -606,12 +652,12 @@ Status.Parent = Scroll
 MinBtn.MouseButton1Click:Connect(function()
     isMinimized = not isMinimized
     if isMinimized then
-        Main.Size = UDim2.new(0, 210, 0, 35)
+        Main.Size = UDim2.new(0, 230, 0, 35)
         Scroll.Visible = false
         SideLamp.Visible = false
         MinBtn.Text = "+"
     else
-        Main.Size = UDim2.new(0, 210, 0, 320)
+        Main.Size = UDim2.new(0, 230, 0, 340)
         Scroll.Visible = true
         SideLamp.Visible = true
         MinBtn.Text = "−"
@@ -622,9 +668,9 @@ print("════════════════════════�
 print("   ZAIXPLOIT | SLIME RNG - FINAL")
 print("═══════════════════════════════════════════")
 print("✅ AUTO GUN | AUTO ROLL (OFF/NORMAL/FAST)")
-print("✅ AUTO INDEX | AUTO FARM LOOT")
+print("✅ AUTO INDEX | AUTO FARM LOOT | AUTO FARM FRUIT")
 print("✅ AUTO UPGRADE | AUTO REBIRTH")
-print("✅ AUTO BUY ZONE + TELEPORT (DepthFade)")
+print("✅ AUTO BUY ZONE + TELEPORT")
 print("✅ AUTO POTION (4 BOOSTS)")
 print("🚀 SCRIPT SIAP DIGUNAKAN")
 print("═══════════════════════════════════════════")
