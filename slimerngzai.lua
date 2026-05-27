@@ -366,7 +366,7 @@ local frame = Instance.new("Frame")
 frame.Size = UDim2.new(0, 280, 0, 460)
 frame.Position = UDim2.new(0.5, -140, 0.5, -230)
 frame.BackgroundColor3 = Color3.fromRGB(10, 10, 20)
-frame.BackgroundTransparency = 0.15
+frame.BackgroundTransparency = 0.3  -- ← TRANSPARAN 0.3
 frame.BorderSizePixel = 0
 frame.Active = true
 frame.Draggable = true
@@ -382,12 +382,13 @@ stroke.Transparency = 0.4
 stroke.Thickness = 1
 stroke.Parent = frame
 
--- ========== SIDE LAMP PALING PANJANG (60 STRIP) ==========
+-- ========== SIDE LAMP (DI DALAM FRAME, PASTI KELIHATAN) ==========
 local sideLamp = Instance.new("Frame")
-sideLamp.Size = UDim2.new(0, 5, 1, 0)
-sideLamp.Position = UDim2.new(0, -6, 0, 0)
+sideLamp.Size = UDim2.new(0, 5, 1, -10)
+sideLamp.Position = UDim2.new(0, 3, 0, 5)  -- ← di DALAM frame
 sideLamp.BackgroundTransparency = 1
 sideLamp.BorderSizePixel = 0
+sideLamp.ZIndex = 10  -- ← biar di atas
 sideLamp.Parent = frame
 
 local colorGradient = {
@@ -407,6 +408,7 @@ for i = 1, 70 do
     strip.Size = UDim2.new(1, 0, 0, 3)
     strip.BackgroundColor3 = colorGradient[(i % #colorGradient) + 1]
     strip.BorderSizePixel = 0
+    strip.ZIndex = 10
     strip.Parent = sideLamp
     table.insert(strips, strip)
 end
@@ -442,7 +444,7 @@ titleCorner.Parent = titleBar
 
 local indicatorLight = Instance.new("Frame")
 indicatorLight.Size = UDim2.new(0, 8, 0, 8)
-indicatorLight.Position = UDim2.new(0, 12, 0.5, -4)
+indicatorLight.Position = UDim2.new(0, 20, 0.5, -4)
 indicatorLight.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
 indicatorLight.BorderSizePixel = 0
 indicatorLight.Parent = titleBar
@@ -694,9 +696,9 @@ end)
 print("═══════════════════════════════════════════")
 print("   ZAIXPLOIT | SLIME RNG - FINAL")
 print("═══════════════════════════════════════════")
-print("✅ SIDE LAMP 70 STRIP (PALING PANJANG)")
-print("✅ BACKGROUND PEAKET (GAK TEMBUS)")
-print("✅ GUI UKURAN 280x460 (GAK KEGEDEAN)")
+print("✅ BACKGROUND TRANSPARAN 0.3")
+print("✅ SIDE LAMP DI DALAM FRAME (PASTI KELIHATAN)")
+print("✅ 70 STRIP GRADIENT BERJALAN")
 print("✅ SEMUA FITUR LENGKAP")
 print("🚀 SCRIPT SIAP DIGUNAKAN")
 print("═══════════════════════════════════════════")
