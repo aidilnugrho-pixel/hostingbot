@@ -21,6 +21,7 @@ local autoUltraLuckActive = false
 local autoCurrencyActive = false
 local autoRollSpeedActive = false
 local maxZoneReached = false
+local targetZone = 0
 
 -- ========== GET REMOTE ==========
 local function getRemote(serviceName)
@@ -241,76 +242,112 @@ task.spawn(function()
     end
 end)
 
--- ========== AUTO BUY ZONE ==========
-local function getBestOpenZone()
-    local bestZone = 0
+-- ========== AUTO BUY + BEST ZONE (FIX TOTAL) ==========
+
+-- Ambil zona player saat ini
+local function getCurrentPlayerZone()
+    local playerZone = localPlayer:FindFirstChild("Zone") or localPlayer:GetAttribute("Zone")
+    if playerZone then
+        return tonumber(playerZone) or 0
+    end
+    
+    -- Backup: cek dari workspace
     local zonesFolder = workspace:FindFirstChild("Zones")
     if zonesFolder then
         for _, zone in ipairs(zonesFolder:GetChildren()) do
             local zoneNum = tonumber(zone.Name) or 0
             local gate = zone:FindFirstChild("Gate")
             local blocker = gate and gate:FindFirstChild("ClientGateBlocker_"..zone.Name)
-            if not blocker or (blocker and not blocker.CanCollide) then
-                if zoneNum > bestZone then bestZone = zoneNum end
+            if blocker and not blocker.CanCollide then
+                if zoneNum > 0 then
+                    return zoneNum
+                end
             end
         end
     end
-    return bestZone
+    return 0
 end
 
+-- Cek apakah bisa beli zona berikutnya
 local function canBuyNextZone()
+    local currentZone = getCurrentPlayerZone()
     local zonesFolder = workspace:FindFirstChild("Zones")
     if not zonesFolder then return false end
-    local currentZoneNum = getBestOpenZone()
-    return zonesFolder:FindFirstChild(tostring(currentZoneNum + 1)) ~= nil
+    local nextZone = zonesFolder:FindFirstChild(tostring(currentZone + 1))
+    return nextZone ~= nil
 end
 
+-- Beli zona
 local function tryBuyZone()
     if not zonesRemote then return false end
     if maxZoneReached then return false end
+    
+    local currentZone = getCurrentPlayerZone()
+    targetZone = currentZone + 1
+    
+    print("✅ [AUTO BUY] Current zone:", currentZone, "→ Buying zone:", targetZone)
+    
     if not canBuyNextZone() then
         maxZoneReached = true
         autoBuyZoneActive = false
+        print("✅ [AUTO BUY] Max zone reached! Stopping...")
         return false
     end
-    local success = pcall(function() zonesRemote:InvokeServer("requestPurchaseZone") end)
+    
+    local success = pcall(function()
+        zonesRemote:InvokeServer("requestPurchaseZone")
+    end)
+    
     if not success then
         maxZoneReached = true
         autoBuyZoneActive = false
+        print("✅ [AUTO BUY] Purchase failed! Stopping...")
         return false
     end
+    
+    print("✅ [AUTO BUY] Zone", targetZone, "purchased!")
     return true
 end
 
-local function tryTeleportToBestZone()
+-- Teleport ke zona target (yang baru dibeli)
+local function tryTeleportToTargetZone()
     if not zonesRemote then return false end
-    local bestZone = getBestOpenZone()
-    if bestZone == 0 then
-        autoBuyZoneActive = false
+    
+    if targetZone == 0 then
+        print("⚠️ [AUTO ZONE] No target zone set!")
         return false
     end
-    pcall(function() zonesRemote:InvokeServer("requestTeleportZone", bestZone) end)
+    
+    print("✅ [AUTO ZONE] Teleporting to zone:", targetZone)
+    
+    pcall(function()
+        zonesRemote:InvokeServer("requestTeleportZone", targetZone)
+    end)
+    
     return true
 end
 
+-- LOOP UTAMA
 task.spawn(function()
     while true do
         if autoBuyZoneActive then
             local bought = tryBuyZone()
             if bought then
-                task.wait(1)
-                tryTeleportToBestZone()
+                task.wait(1.5)  -- Tunggu biar zona terdaftar
+                tryTeleportToTargetZone()
             end
         end
         task.wait(5)
     end
 end)
 
+-- Reset flag setiap 2 menit
 task.spawn(function()
     while true do
         task.wait(120)
         if maxZoneReached and canBuyNextZone() then
             maxZoneReached = false
+            print("✅ [AUTO BUY] New zone detected! You can re-enable Auto Buy.")
         end
     end
 end)
@@ -356,16 +393,16 @@ end
 deleteAutoRejoinService()
 task.spawn(function() while true do task.wait(10) deleteAutoRejoinService() end end)
 
--- ========== CREATE GUI MAKSIMAL (AMAN) ==========
+-- ========== CREATE GUI ==========
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "ZAIXPLOIT"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = localPlayer:WaitForChild("PlayerGui")
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 290, 0, 410)
-frame.Position = UDim2.new(0.5, -145, 0.5, -205)
-frame.BackgroundColor3 = Color3.fromRGB(8, 8, 18)
+frame.Size = UDim2.new(0, 280, 0, 400)
+frame.Position = UDim2.new(0.5, -140, 0.5, -200)
+frame.BackgroundColor3 = Color3.fromRGB(10, 10, 20)
 frame.BackgroundTransparency = 0.35
 frame.BorderSizePixel = 0
 frame.Active = true
@@ -373,16 +410,16 @@ frame.Draggable = true
 frame.Parent = screenGui
 
 local corner = Instance.new("UICorner")
-corner.CornerRadius = UDim.new(0, 13)
+corner.CornerRadius = UDim.new(0, 12)
 corner.Parent = frame
 
 local stroke = Instance.new("UIStroke")
-stroke.Color = Color3.fromRGB(0, 190, 255)
-stroke.Transparency = 0.25
+stroke.Color = Color3.fromRGB(0, 200, 255)
+stroke.Transparency = 0.3
 stroke.Thickness = 1
 stroke.Parent = frame
 
--- ========== SIDE LAMP GRADIENT (BIRU MUDA KE BIRU TUA) ==========
+-- ========== SIDE LAMP GRADIENT ==========
 local sideLamp = Instance.new("Frame")
 sideLamp.Size = UDim2.new(0, 6, 1, -5)
 sideLamp.Position = UDim2.new(0, 2, 0, 5)
@@ -391,23 +428,15 @@ sideLamp.BorderSizePixel = 0
 sideLamp.ZIndex = 10
 sideLamp.Parent = frame
 
--- Warna gradient biru muda → biru tua (15 warna)
 local colorGradient = {
-    Color3.fromRGB(180, 230, 255), -- Biru sangat muda
-    Color3.fromRGB(150, 210, 255), -- Biru muda
-    Color3.fromRGB(120, 190, 255), -- Biru muda gelap
-    Color3.fromRGB(90, 170, 255),  -- Biru cerah
-    Color3.fromRGB(70, 150, 255),  -- Biru terang
-    Color3.fromRGB(50, 130, 255),  -- Biru medium terang
-    Color3.fromRGB(40, 110, 255),  -- Biru medium
-    Color3.fromRGB(30, 95, 230),   -- Biru medium gelap
-    Color3.fromRGB(25, 80, 210),   -- Biru gelap cerah
-    Color3.fromRGB(20, 65, 190),   -- Biru gelap
-    Color3.fromRGB(15, 55, 170),   -- Biru gelap tua
-    Color3.fromRGB(12, 45, 150),   -- Biru tua
-    Color3.fromRGB(10, 35, 130),   -- Biru sangat tua
-    Color3.fromRGB(8, 25, 110),    -- Biru pekat
-    Color3.fromRGB(5, 15, 90),     -- Biru paling pekat
+    Color3.fromRGB(0, 80, 255),
+    Color3.fromRGB(0, 130, 255),
+    Color3.fromRGB(0, 180, 255),
+    Color3.fromRGB(100, 200, 255),
+    Color3.fromRGB(255, 220, 0),
+    Color3.fromRGB(255, 180, 0),
+    Color3.fromRGB(40, 40, 55),
+    Color3.fromRGB(20, 20, 35),
 }
 
 local strips = {}
@@ -467,7 +496,6 @@ task.spawn(function()
     end
 end)
 
--- Baris 1 Kiri
 local titleText = Instance.new("TextLabel")
 titleText.Size = UDim2.new(0.5, 0, 0, 16)
 titleText.Position = UDim2.new(0, 28, 0, 5)
@@ -479,7 +507,6 @@ titleText.TextSize = 13
 titleText.TextXAlignment = Enum.TextXAlignment.Left
 titleText.Parent = titleBar
 
--- Baris 1 Kanan
 local nickText = Instance.new("TextLabel")
 nickText.Size = UDim2.new(0.5, -50, 0, 16)
 nickText.Position = UDim2.new(0.5, 0, 0, 5)
@@ -491,7 +518,6 @@ nickText.TextSize = 11
 nickText.TextXAlignment = Enum.TextXAlignment.Right
 nickText.Parent = titleBar
 
--- Baris 2 Kiri
 local subTitleText = Instance.new("TextLabel")
 subTitleText.Size = UDim2.new(0.5, 0, 0, 12)
 subTitleText.Position = UDim2.new(0, 28, 0, 23)
@@ -503,7 +529,6 @@ subTitleText.TextSize = 9
 subTitleText.TextXAlignment = Enum.TextXAlignment.Left
 subTitleText.Parent = titleBar
 
--- Baris 2 Kanan
 local userText = Instance.new("TextLabel")
 userText.Size = UDim2.new(0.5, -50, 0, 12)
 userText.Position = UDim2.new(0.5, 0, 0, 23)
@@ -515,7 +540,6 @@ userText.TextSize = 8
 userText.TextXAlignment = Enum.TextXAlignment.Right
 userText.Parent = titleBar
 
--- MINIMIZE BUTTON
 local minBtn = Instance.new("TextButton")
 minBtn.Size = UDim2.new(0, 20, 0, 20)
 minBtn.Position = UDim2.new(1, -28, 0, 17)
@@ -704,9 +728,11 @@ end)
 print("═══════════════════════════════════════════")
 print("   ZAIXPLOIT | SLIME RNG - FINAL")
 print("═══════════════════════════════════════════")
-print("✅ GRADIENT 100 STRIP × 2px (LEBIH HALUS)")
-print("✅ 12 WARNA GRADIENT (BIRU→KUNING→HITAM)")
-print("✅ SIDE LAMP LEBAR 6px")
-print("✅ SEMUA FITUR LENGKAP")
+print("✅ AUTO GUN (0.033s) | AUTO ROLL (0.033s)")
+print("✅ AUTO INDEX (5s) | AUTO UPGRADE (1s)")
+print("✅ AUTO POTION (1s) | AUTO FARM (0.5s)")
+print("✅ AUTO BUY ZONE (FIX - TELEPORT KE ZONA BENAR)")
+print("✅ SIDE LAMP GRADIENT 160 STRIP")
+print("✅ ANTI AFK + DELETE AUTOREJOIN")
 print("🚀 SCRIPT SIAP DIGUNAKAN")
 print("═══════════════════════════════════════════")
