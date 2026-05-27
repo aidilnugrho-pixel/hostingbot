@@ -242,7 +242,34 @@ task.spawn(function()
     end
 end)
 
--- ========== AUTO BUY + BEST ZONE (FIX TOTAL) ==========
+-- ========== AUTO BUY + BEST ZONE (FIX - DETEKSI LEWAT POI.HITBOX) ==========
+
+-- Ambil zona tertinggi yang TERBUKA (berdasarkan POI.Hitbox)
+local function getBestOpenZone()
+    local bestZone = 0
+    local zonesFolder = workspace:FindFirstChild("Zones")
+    
+    if not zonesFolder then
+        return 0
+    end
+    
+    for _, zone in ipairs(zonesFolder:GetChildren()) do
+        local zoneNum = tonumber(zone.Name)
+        if zoneNum and zoneNum > 0 then
+            local poi = zone:FindFirstChild("POI")
+            if poi then
+                local hitbox = poi:FindFirstChild("Hitbox")
+                if hitbox then
+                    if zoneNum > bestZone then
+                        bestZone = zoneNum
+                    end
+                end
+            end
+        end
+    end
+    
+    return bestZone
+end
 
 -- Ambil zona player saat ini
 local function getCurrentPlayerZone()
@@ -250,22 +277,7 @@ local function getCurrentPlayerZone()
     if playerZone then
         return tonumber(playerZone) or 0
     end
-    
-    -- Backup: cek dari workspace
-    local zonesFolder = workspace:FindFirstChild("Zones")
-    if zonesFolder then
-        for _, zone in ipairs(zonesFolder:GetChildren()) do
-            local zoneNum = tonumber(zone.Name) or 0
-            local gate = zone:FindFirstChild("Gate")
-            local blocker = gate and gate:FindFirstChild("ClientGateBlocker_"..zone.Name)
-            if blocker and not blocker.CanCollide then
-                if zoneNum > 0 then
-                    return zoneNum
-                end
-            end
-        end
-    end
-    return 0
+    return getBestOpenZone()
 end
 
 -- Cek apakah bisa beli zona berikutnya
@@ -285,12 +297,9 @@ local function tryBuyZone()
     local currentZone = getCurrentPlayerZone()
     targetZone = currentZone + 1
     
-    print("✅ [AUTO BUY] Current zone:", currentZone, "→ Buying zone:", targetZone)
-    
     if not canBuyNextZone() then
         maxZoneReached = true
         autoBuyZoneActive = false
-        print("✅ [AUTO BUY] Max zone reached! Stopping...")
         return false
     end
     
@@ -301,41 +310,20 @@ local function tryBuyZone()
     if not success then
         maxZoneReached = true
         autoBuyZoneActive = false
-        print("✅ [AUTO BUY] Purchase failed! Stopping...")
         return false
     end
     
-    print("✅ [AUTO BUY] Zone", targetZone, "purchased!")
     return true
 end
 
-
--- Teleport ke zona tertinggi yang terbuka (BERDASARKAN GATE)
+-- Teleport ke zona terbaik yang terbuka
 local function tryTeleportToBestZone()
     if not zonesRemote then return false end
     
-    local bestZone = 0
-    local zonesFolder = workspace:FindFirstChild("Zones")
-    if zonesFolder then
-        for _, zone in ipairs(zonesFolder:GetChildren()) do
-            local zoneNum = tonumber(zone.Name) or 0
-            if zoneNum > 0 then
-                local gate = zone:FindFirstChild("Gate")
-                if gate then
-                    local blocker = gate:FindFirstChild("ClientGateBlocker_" .. zoneNum)
-                    if blocker and not blocker.CanCollide then
-                        if zoneNum > bestZone then
-                            bestZone = zoneNum
-                        end
-                    end
-                end
-            end
-        end
-    end
+    local bestZone = getBestOpenZone()
     
     if bestZone == 0 then
         autoBuyZoneActive = false
-        print("✅ [AUTO ZONE] No open zone to teleport! Stopping...")
         return false
     end
     
@@ -343,9 +331,32 @@ local function tryTeleportToBestZone()
         zonesRemote:InvokeServer("requestTeleportZone", bestZone)
     end)
     
-    print("✅ [AUTO ZONE] Teleported to zone:", bestZone)
     return true
 end
+
+-- LOOP UTAMA
+task.spawn(function()
+    while true do
+        if autoBuyZoneActive then
+            local bought = tryBuyZone()
+            if bought then
+                task.wait(1.5)
+                tryTeleportToBestZone()
+            end
+        end
+        task.wait(5)
+    end
+end)
+
+-- Reset flag setiap 2 menit
+task.spawn(function()
+    while true do
+        task.wait(120)
+        if maxZoneReached and canBuyNextZone() then
+            maxZoneReached = false
+        end
+    end
+end)
 
 -- ========== AUTO POTIONS ==========
 local function useBoost(boostType)
@@ -395,10 +406,10 @@ screenGui.ResetOnSpawn = false
 screenGui.Parent = localPlayer:WaitForChild("PlayerGui")
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 280, 0, 380)
+frame.Size = UDim2.new(0, 280, 0, 400)
 frame.Position = UDim2.new(0.5, -140, 0.5, -200)
-frame.BackgroundColor3 = Color3.fromRGB(10, 10, 20)
-frame.BackgroundTransparency = 0.35
+frame.BackgroundColor3 = Color3.fromRGB(8, 8, 18)
+frame.BackgroundTransparency = 0.25
 frame.BorderSizePixel = 0
 frame.Active = true
 frame.Draggable = true
@@ -414,7 +425,7 @@ stroke.Transparency = 0.3
 stroke.Thickness = 1
 stroke.Parent = frame
 
--- ========== SIDE LAMP GRADIENT ==========
+-- ========== SIDE LAMP GRADIENT (100 STRIP, TINGGI 3px) ==========
 local sideLamp = Instance.new("Frame")
 sideLamp.Size = UDim2.new(0, 6, 1, -5)
 sideLamp.Position = UDim2.new(0, 2, 0, 5)
@@ -435,9 +446,9 @@ local colorGradient = {
 }
 
 local strips = {}
-for i = 1, 160 do
+for i = 1, 100 do
     local strip = Instance.new("Frame")
-    strip.Size = UDim2.new(1, 0, 0, 2)
+    strip.Size = UDim2.new(1, 0, 0, 3)
     strip.BackgroundColor3 = colorGradient[(i % #colorGradient) + 1]
     strip.BorderSizePixel = 0
     strip.ZIndex = 10
@@ -726,8 +737,9 @@ print("════════════════════════�
 print("✅ AUTO GUN (0.033s) | AUTO ROLL (0.033s)")
 print("✅ AUTO INDEX (5s) | AUTO UPGRADE (1s)")
 print("✅ AUTO POTION (1s) | AUTO FARM (0.5s)")
-print("✅ AUTO BUY ZONE (FIX - TELEPORT KE ZONA BENAR)")
-print("✅ SIDE LAMP GRADIENT 160 STRIP")
+print("✅ AUTO BUY ZONE (FIX - POI.HITBOX DETECTION)")
+print("✅ BACKGROUND LEBIH GELAP (0.25)")
+print("✅ SIDE LAMP 100 STRIP × 3px")
 print("✅ ANTI AFK + DELETE AUTOREJOIN")
 print("🚀 SCRIPT SIAP DIGUNAKAN")
 print("═══════════════════════════════════════════")
