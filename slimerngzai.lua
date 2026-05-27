@@ -363,10 +363,10 @@ screenGui.ResetOnSpawn = false
 screenGui.Parent = localPlayer:WaitForChild("PlayerGui")
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 280, 0, 400)
+frame.Size = UDim2.new(0, 280, 0, 350)
 frame.Position = UDim2.new(0.5, -140, 0.5, -200)
 frame.BackgroundColor3 = Color3.fromRGB(10, 10, 20)
-frame.BackgroundTransparency = 0.4
+frame.BackgroundTransparency = 0.5
 frame.BorderSizePixel = 0
 frame.Active = true
 frame.Draggable = true
@@ -384,7 +384,7 @@ stroke.Parent = frame
 
 -- ========== SIDE LAMP GRADIENT BAGUS (100 STRIP, 2px) ==========
 local sideLamp = Instance.new("Frame")
-sideLamp.Size = UDim2.new(0, 6, 1, -10)  -- lebih lebar 6px
+sideLamp.Size = UDim2.new(0, 4, 1, -10)  -- lebih lebar 6px
 sideLamp.Position = UDim2.new(0, 3, 0, 5)
 sideLamp.BackgroundTransparency = 1
 sideLamp.BorderSizePixel = 0
@@ -399,12 +399,6 @@ local colorGradient = {
     Color3.fromRGB(0, 160, 255),
     Color3.fromRGB(50, 200, 255),
     Color3.fromRGB(150, 220, 255),
-    Color3.fromRGB(255, 230, 100),
-    Color3.fromRGB(255, 200, 50),
-    Color3.fromRGB(255, 160, 0),
-    Color3.fromRGB(60, 50, 70),
-    Color3.fromRGB(30, 25, 45),
-    Color3.fromRGB(15, 15, 30),
 }
 
 local strips = {}
