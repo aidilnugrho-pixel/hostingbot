@@ -309,48 +309,43 @@ local function tryBuyZone()
     return true
 end
 
--- Teleport ke zona target (yang baru dibeli)
-local function tryTeleportToTargetZone()
+
+-- Teleport ke zona tertinggi yang terbuka (BERDASARKAN GATE)
+local function tryTeleportToBestZone()
     if not zonesRemote then return false end
     
-    if targetZone == 0 then
-        print("⚠️ [AUTO ZONE] No target zone set!")
+    local bestZone = 0
+    local zonesFolder = workspace:FindFirstChild("Zones")
+    if zonesFolder then
+        for _, zone in ipairs(zonesFolder:GetChildren()) do
+            local zoneNum = tonumber(zone.Name) or 0
+            if zoneNum > 0 then
+                local gate = zone:FindFirstChild("Gate")
+                if gate then
+                    local blocker = gate:FindFirstChild("ClientGateBlocker_" .. zoneNum)
+                    if blocker and not blocker.CanCollide then
+                        if zoneNum > bestZone then
+                            bestZone = zoneNum
+                        end
+                    end
+                end
+            end
+        end
+    end
+    
+    if bestZone == 0 then
+        autoBuyZoneActive = false
+        print("✅ [AUTO ZONE] No open zone to teleport! Stopping...")
         return false
     end
     
-    print("✅ [AUTO ZONE] Teleporting to zone:", targetZone)
-    
     pcall(function()
-        zonesRemote:InvokeServer("requestTeleportZone", targetZone)
+        zonesRemote:InvokeServer("requestTeleportZone", bestZone)
     end)
     
+    print("✅ [AUTO ZONE] Teleported to zone:", bestZone)
     return true
 end
-
--- LOOP UTAMA
-task.spawn(function()
-    while true do
-        if autoBuyZoneActive then
-            local bought = tryBuyZone()
-            if bought then
-                task.wait(1.5)  -- Tunggu biar zona terdaftar
-                tryTeleportToTargetZone()
-            end
-        end
-        task.wait(5)
-    end
-end)
-
--- Reset flag setiap 2 menit
-task.spawn(function()
-    while true do
-        task.wait(120)
-        if maxZoneReached and canBuyNextZone() then
-            maxZoneReached = false
-            print("✅ [AUTO BUY] New zone detected! You can re-enable Auto Buy.")
-        end
-    end
-end)
 
 -- ========== AUTO POTIONS ==========
 local function useBoost(boostType)
