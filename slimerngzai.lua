@@ -360,60 +360,71 @@ task.spawn(function() while true do task.wait(10) deleteAutoRejoinService() end 
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "ZAIXPLOIT"
 screenGui.ResetOnSpawn = false
+screenGui.IgnoreGuiInset = true
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 screenGui.Parent = localPlayer:WaitForChild("PlayerGui")
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 280, 0, 350)
-frame.Position = UDim2.new(0.5, -140, 0.5, -200)
-frame.BackgroundColor3 = Color3.fromRGB(10, 10, 20)
-frame.BackgroundTransparency = 0.4
+frame.Size = UDim2.new(0, 300, 0, 420)
+frame.Position = UDim2.new(0.5, -150, 0.5, -210)
+frame.BackgroundColor3 = Color3.fromRGB(8, 8, 18)
+frame.BackgroundTransparency = 0.35
 frame.BorderSizePixel = 0
 frame.Active = true
 frame.Draggable = true
 frame.Parent = screenGui
 
+-- Corner (sudut melengkung)
 local corner = Instance.new("UICorner")
-corner.CornerRadius = UDim.new(0, 12)
+corner.CornerRadius = UDim.new(0, 14)
 corner.Parent = frame
 
+-- Stroke (garis tepi)
 local stroke = Instance.new("UIStroke")
-stroke.Color = Color3.fromRGB(0, 200, 255)
-stroke.Transparency = 0.2
-stroke.Thickness = 1
+stroke.Color = Color3.fromRGB(0, 180, 255)
+stroke.Transparency = 0.25
+stroke.Thickness = 1.5
 stroke.Parent = frame
 
--- ========== SIDE LAMP GRADIENT MAKSIMAL ==========
+-- Shadow (bayangan) biar lebih elegan
+local shadow = Instance.new("UIShadow")
+shadow.Color = Color3.fromRGB(0, 0, 0)
+shadow.Transparency = 0.6
+shadow.Size = 8
+shadow.Parent = frame
+
+-- ========== SIDE LAMP GRADIENT (BIRU MUDA KE BIRU TUA) ==========
 local sideLamp = Instance.new("Frame")
-sideLamp.Size = UDim2.new(0, 6, 1, -5)  -- lebar 6px, jarak bawah 5px
+sideLamp.Size = UDim2.new(0, 6, 1, -5)
 sideLamp.Position = UDim2.new(0, 2, 0, 5)
 sideLamp.BackgroundTransparency = 1
 sideLamp.BorderSizePixel = 0
 sideLamp.ZIndex = 10
 sideLamp.Parent = frame
 
--- Warna gradient 15 warna (biru → kuning → hitam)
+-- Warna gradient biru muda → biru tua (15 warna)
 local colorGradient = {
-    Color3.fromRGB(0, 40, 180),     -- Biru gelap 1
-    Color3.fromRGB(0, 60, 210),     -- Biru gelap 2
-    Color3.fromRGB(0, 85, 235),     -- Biru medium 1
-    Color3.fromRGB(0, 110, 245),    -- Biru medium 2
-    Color3.fromRGB(0, 140, 255),    -- Biru terang 1
-    Color3.fromRGB(0, 170, 255),    -- Biru terang 2
-    Color3.fromRGB(50, 200, 255),   -- Biru muda
-    Color3.fromRGB(130, 225, 255),  -- Biru sangat muda
-    Color3.fromRGB(255, 240, 100),  -- Kuning terang
-    Color3.fromRGB(255, 210, 60),   -- Kuning
-    Color3.fromRGB(255, 170, 20),   -- Kuning tua
-    Color3.fromRGB(200, 120, 30),   -- Oranye kecoklatan
-    Color3.fromRGB(100, 70, 80),    -- Hitam kebiruan 1
-    Color3.fromRGB(55, 45, 65),     -- Hitam kebiruan 2
-    Color3.fromRGB(25, 25, 45),     -- Hitam pekat
+    Color3.fromRGB(180, 230, 255), -- Biru sangat muda
+    Color3.fromRGB(150, 210, 255), -- Biru muda
+    Color3.fromRGB(120, 190, 255), -- Biru muda gelap
+    Color3.fromRGB(90, 170, 255),  -- Biru cerah
+    Color3.fromRGB(70, 150, 255),  -- Biru terang
+    Color3.fromRGB(50, 130, 255),  -- Biru medium terang
+    Color3.fromRGB(40, 110, 255),  -- Biru medium
+    Color3.fromRGB(30, 95, 230),   -- Biru medium gelap
+    Color3.fromRGB(25, 80, 210),   -- Biru gelap cerah
+    Color3.fromRGB(20, 65, 190),   -- Biru gelap
+    Color3.fromRGB(15, 55, 170),   -- Biru gelap tua
+    Color3.fromRGB(12, 45, 150),   -- Biru tua
+    Color3.fromRGB(10, 35, 130),   -- Biru sangat tua
+    Color3.fromRGB(8, 25, 110),    -- Biru pekat
+    Color3.fromRGB(5, 15, 90),     -- Biru paling pekat
 }
 
 local strips = {}
-for i = 1, 160 do  -- 160 strip
+for i = 1, 160 do
     local strip = Instance.new("Frame")
-    strip.Size = UDim2.new(1, 0, 0, 2)  -- tinggi 2px
+    strip.Size = UDim2.new(1, 0, 0, 2)
     strip.BackgroundColor3 = colorGradient[(i % #colorGradient) + 1]
     strip.BorderSizePixel = 0
     strip.ZIndex = 10
@@ -421,13 +432,11 @@ for i = 1, 160 do  -- 160 strip
     table.insert(strips, strip)
 end
 
--- Susunan rapat tanpa jarak
 local sideLayout = Instance.new("UIListLayout")
 sideLayout.FillDirection = Enum.FillDirection.Vertical
 sideLayout.Padding = UDim.new(0, 0)
 sideLayout.Parent = sideLamp
 
--- Animasi berjalan
 local offset = 0
 task.spawn(function()
     while true do
@@ -436,7 +445,7 @@ task.spawn(function()
             strip.BackgroundColor3 = colorGradient[colorIndex]
         end
         offset = offset + 1
-        task.wait(0.03)
+        task.wait(0.05)
     end
 end)
 
