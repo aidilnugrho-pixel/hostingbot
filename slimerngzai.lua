@@ -260,9 +260,7 @@ task.spawn(function()
     end
 end)
 
--- ========== AUTO BUY + BEST ZONE (FIX) ==========
-
--- Cek zona terbaik yang sudah terbuka
+-- ========== AUTO BUY + BEST ZONE ==========
 local function getBestOpenZone()
     local bestZone = 0
     local zonesFolder = workspace:FindFirstChild("Zones")
@@ -281,7 +279,6 @@ local function getBestOpenZone()
     return bestZone
 end
 
--- Cek apakah bisa beli zona berikutnya
 local function canBuyNextZone()
     local zonesFolder = workspace:FindFirstChild("Zones")
     if not zonesFolder then return false end
@@ -290,7 +287,6 @@ local function canBuyNextZone()
     return nextZone ~= nil
 end
 
--- Beli zona
 local function tryBuyZone()
     if not zonesRemote then return false end
     if maxZoneReached then return false end
@@ -310,7 +306,6 @@ local function tryBuyZone()
     return true
 end
 
--- Teleport ke zona tertinggi
 local function tryTeleportToBestZone()
     if not zonesRemote then return false end
     local bestZone = getBestOpenZone()
@@ -389,17 +384,17 @@ end
 deleteAutoRejoinService()
 task.spawn(function() while true do task.wait(10) deleteAutoRejoinService() end end)
 
--- ========== CREATE GUI ==========
+-- ========== CREATE GUI (BACKGROUND LEBIH TERANG) ==========
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "ZAIXPLOIT"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = localPlayer:WaitForChild("PlayerGui")
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 320, 0, 500)
-frame.Position = UDim2.new(0.5, -160, 0.5, -250)
-frame.BackgroundColor3 = Color3.fromRGB(8, 8, 18)
-frame.BackgroundTransparency = 0.35
+frame.Size = UDim2.new(0, 320, 0, 520)
+frame.Position = UDim2.new(0.5, -160, 0.5, -260)
+frame.BackgroundColor3 = Color3.fromRGB(25, 25, 45)  -- LEBIH TERANG
+frame.BackgroundTransparency = 0.55  -- LEBIH TRANSPARAN
 frame.BorderSizePixel = 0
 frame.Active = true
 frame.Draggable = true
@@ -464,8 +459,8 @@ end)
 -- ========== TITLE BAR ==========
 local titleBar = Instance.new("Frame")
 titleBar.Size = UDim2.new(1, 0, 0, 60)
-titleBar.BackgroundColor3 = Color3.fromRGB(20, 18, 35)
-titleBar.BackgroundTransparency = 0.4
+titleBar.BackgroundColor3 = Color3.fromRGB(30, 28, 50)
+titleBar.BackgroundTransparency = 0.3
 titleBar.BorderSizePixel = 0
 titleBar.Parent = frame
 
@@ -582,7 +577,7 @@ local function addSeparator(parent)
     local line = Instance.new("Frame")
     line.Size = UDim2.new(1, 0, 0, 1)
     line.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
-    line.BackgroundTransparency = 0.7
+    line.BackgroundTransparency = 0.6
     line.BorderSizePixel = 0
     line.Parent = parent
     return line
@@ -592,8 +587,8 @@ end
 local function createToggle(parent, text, emoji, getState, setState)
     local frame = Instance.new("Frame")
     frame.Size = UDim2.new(1, 0, 0, 34)
-    frame.BackgroundColor3 = Color3.fromRGB(22, 20, 38)
-    frame.BackgroundTransparency = 0.2
+    frame.BackgroundColor3 = Color3.fromRGB(30, 28, 48)
+    frame.BackgroundTransparency = 0.3
     frame.BorderSizePixel = 0
     frame.Parent = parent
     local toggleCorner = Instance.new("UICorner")
@@ -605,7 +600,7 @@ local function createToggle(parent, text, emoji, getState, setState)
     label.Position = UDim2.new(0, 10, 0, 0)
     label.BackgroundTransparency = 1
     label.Text = emoji .. " " .. text
-    label.TextColor3 = Color3.fromRGB(210, 210, 240)
+    label.TextColor3 = Color3.fromRGB(220, 220, 250)
     label.Font = Enum.Font.FredokaOne
     label.TextSize = 11
     label.TextXAlignment = Enum.TextXAlignment.Left
@@ -614,7 +609,7 @@ local function createToggle(parent, text, emoji, getState, setState)
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(0, 55, 0, 26)
     btn.Position = UDim2.new(1, -62, 0.5, -13)
-    btn.BackgroundColor3 = getState() and Color3.fromRGB(50, 200, 80) or Color3.fromRGB(45, 40, 65)
+    btn.BackgroundColor3 = getState() and Color3.fromRGB(50, 200, 80) or Color3.fromRGB(55, 50, 75)
     btn.Text = getState() and "ON" or "OFF"
     btn.TextColor3 = Color3.fromRGB(255, 255, 255)
     btn.Font = Enum.Font.FredokaOne
@@ -632,7 +627,7 @@ local function createToggle(parent, text, emoji, getState, setState)
             btn.BackgroundColor3 = Color3.fromRGB(50, 200, 80)
             btn.Text = "ON"
         else
-            btn.BackgroundColor3 = Color3.fromRGB(45, 40, 65)
+            btn.BackgroundColor3 = Color3.fromRGB(55, 50, 75)
             btn.Text = "OFF"
         end
     end)
@@ -717,7 +712,7 @@ minBtn.MouseButton1Click:Connect(function()
         sideLamp.Visible = false
         minBtn.Text = "+"
     else
-        frame.Size = UDim2.new(0, 320, 0, 500)
+        frame.Size = UDim2.new(0, 320, 0, 520)
         contentScroll.Visible = true
         sideLamp.Visible = true
         minBtn.Text = "−"
@@ -727,9 +722,8 @@ end)
 print("═══════════════════════════════════════════")
 print("   ZAIXPLOIT | SLIME RNG - FINAL")
 print("═══════════════════════════════════════════")
-print("✅ SIDE LAMP FULL PANJANG SAMPAI BAWAH")
-print("✅ GRADIENT BERJALAN (BIRU-KUNING-HITAM)")
-print("✅ BACKGROUND LEBIH TRANSPARAN")
-print("✅ BISA SCROLL KE BAWAH")
+print("✅ BACKGROUND LEBIH TERANG & TRANSPARAN")
+print("✅ SIDE LAMP FULL PANJANG")
+print("✅ SEMUA FITUR LENGKAP")
 print("🚀 SCRIPT SIAP DIGUNAKAN")
 print("═══════════════════════════════════════════")
