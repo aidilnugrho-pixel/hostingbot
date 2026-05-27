@@ -288,8 +288,8 @@ GUI.ResetOnSpawn = false
 GUI.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
 local Main = Instance.new("Frame")
-Main.Size = UDim2.new(0, 230, 0, 340)
-Main.Position = UDim2.new(0.5, -115, 0.5, -170)
+Main.Size = UDim2.new(0, 240, 0, 320)
+Main.Position = UDim2.new(0.5, -120, 0.5, -160)
 Main.BackgroundColor3 = Color3.fromRGB(8, 6, 15)
 Main.BackgroundTransparency = 0.05
 Main.BorderSizePixel = 0
@@ -321,6 +321,7 @@ SideLamp.Size = UDim2.new(0, 4, 1, -8)
 SideLamp.Position = UDim2.new(0, 2, 0, 4)
 SideLamp.BackgroundTransparency = 1
 SideLamp.BorderSizePixel = 0
+SideLamp.ClipsDescendants = true
 SideLamp.Parent = Main
 
 local SideCorner = Instance.new("UICorner")
@@ -343,9 +344,12 @@ local NeonColors = {
 }
 
 local Strips = {}
-for i = 1, 45 do
+local StripHeight = 8
+local TotalHeight = Main.Size.Y.Offset - 16
+
+for i = 1, math.floor(TotalHeight / StripHeight) do
     local Strip = Instance.new("Frame")
-    Strip.Size = UDim2.new(1, 0, 0, 8)
+    Strip.Size = UDim2.new(1, 0, 0, StripHeight)
     Strip.BackgroundColor3 = NeonColors[1]
     Strip.BorderSizePixel = 0
     Strip.Parent = SideLamp
@@ -652,12 +656,12 @@ Status.Parent = Scroll
 MinBtn.MouseButton1Click:Connect(function()
     isMinimized = not isMinimized
     if isMinimized then
-        Main.Size = UDim2.new(0, 230, 0, 35)
+        Main.Size = UDim2.new(0, 240, 0, 35)
         Scroll.Visible = false
         SideLamp.Visible = false
         MinBtn.Text = "+"
     else
-        Main.Size = UDim2.new(0, 230, 0, 340)
+        Main.Size = UDim2.new(0, 240, 0, 320)
         Scroll.Visible = true
         SideLamp.Visible = true
         MinBtn.Text = "−"
