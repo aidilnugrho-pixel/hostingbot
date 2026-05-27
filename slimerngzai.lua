@@ -384,7 +384,7 @@ stroke.Parent = frame
 
 -- ========== SIDE LAMP GRADIENT BAGUS (100 STRIP, 2px) ==========
 local sideLamp = Instance.new("Frame")
-sideLamp.Size = UDim2.new(0, 4, 1, -10)  -- lebih lebar 6px
+sideLamp.Size = UDim2.new(0, 6, 1, 0)  -- lebih lebar 6px
 sideLamp.Position = UDim2.new(0, 3, 0, 5)
 sideLamp.BackgroundTransparency = 1
 sideLamp.BorderSizePixel = 0
@@ -402,7 +402,7 @@ local colorGradient = {
 }
 
 local strips = {}
-for i = 1, 20 do  -- 100 strip
+for i = 1, 200 do  -- 100 strip
     local strip = Instance.new("Frame")
     strip.Size = UDim2.new(1, 0, 0, 4)  -- tinggi 2px
     strip.BackgroundColor3 = colorGradient[(i % #colorGradient) + 1]
