@@ -260,18 +260,19 @@ task.spawn(function()
     end
 end)
 
--- ========== AUTO BUY + BEST ZONE (FIX - BELI DULU BARU TP) ==========
+-- ========== AUTO BUY + BEST ZONE (FIX - TELEPORT KE ZONA TERTINGGI) ==========
 
--- Cek zona terbaik yang sudah terbuka
+-- Cek zona terbaik yang sudah terbuka (FIX: ambil zona tertinggi)
 local function getBestOpenZone()
     local bestZone = 0
     local zonesFolder = workspace:FindFirstChild("Zones")
     if zonesFolder then
         for _, zone in ipairs(zonesFolder:GetChildren()) do
+            local zoneNum = tonumber(zone.Name) or 0
+            -- Cek apakah zona terbuka (bisa diakses)
             local gate = zone:FindFirstChild("Gate")
             local blocker = gate and gate:FindFirstChild("ClientGateBlocker_"..zone.Name)
             if not blocker or (blocker and not blocker.CanCollide) then
-                local zoneNum = tonumber(zone.Name) or 0
                 if zoneNum > bestZone then
                     bestZone = zoneNum
                 end
@@ -318,7 +319,7 @@ local function tryBuyZone()
     return true
 end
 
--- Teleport ke best zone (zona terbuka tertinggi)
+-- Teleport ke zona tertinggi yang sudah terbuka (FIX: sekarang ke zona 38 bukan 37)
 local function tryTeleportToBestZone()
     if not zonesRemote then return false end
     
@@ -342,15 +343,12 @@ end
 task.spawn(function()
     while true do
         if autoBuyZoneActive then
-            -- Cek zona terbaik saat ini
-            local currentBest = getBestOpenZone()
-            
             -- Beli zona dulu
             local bought = tryBuyZone()
             
             if bought then
                 task.wait(1)
-                -- Setelah beli, teleport ke zona terbaik (yang baru)
+                -- Setelah beli, teleport ke zona tertinggi yang terbuka
                 tryTeleportToBestZone()
             end
         end
@@ -422,7 +420,7 @@ local frame = Instance.new("Frame")
 frame.Size = UDim2.new(0, 340, 0, 520)
 frame.Position = UDim2.new(0.5, -170, 0.5, -260)
 frame.BackgroundColor3 = Color3.fromRGB(10, 10, 20)
-frame.BackgroundTransparency = 0.15
+frame.BackgroundTransparency = 0.3  -- Lebih transparan
 frame.BorderSizePixel = 0
 frame.Active = true
 frame.Draggable = true
@@ -438,10 +436,10 @@ stroke.Transparency = 0.5
 stroke.Thickness = 1
 stroke.Parent = frame
 
--- ========== SIDE LAMP GRADIENT BERJALAN (FULL PANJANG) ==========
+-- ========== SIDE LAMP GRADIENT BERJALAN (FULL PANJANG SAMPAI BAWAH) ==========
 local sideLamp = Instance.new("Frame")
-sideLamp.Size = UDim2.new(0, 5, 1, -8)
-sideLamp.Position = UDim2.new(0, -7, 0, 4)
+sideLamp.Size = UDim2.new(0, 5, 1, -5)  -- Full dari atas ke bawah
+sideLamp.Position = UDim2.new(0, -7, 0, 2)
 sideLamp.BackgroundTransparency = 1
 sideLamp.BorderSizePixel = 0
 sideLamp.Parent = frame
@@ -458,7 +456,7 @@ local colorGradient = {
 }
 
 local strips = {}
-for i = 1, 26 do
+for i = 1, 30 do  -- Lebih banyak strip untuk full panjang
     local strip = Instance.new("Frame")
     strip.Size = UDim2.new(1, 0, 0, 5)
     strip.BackgroundColor3 = colorGradient[(i % #colorGradient) + 1]
@@ -488,7 +486,7 @@ end)
 local titleBar = Instance.new("Frame")
 titleBar.Size = UDim2.new(1, 0, 0, 60)
 titleBar.BackgroundColor3 = Color3.fromRGB(20, 18, 35)
-titleBar.BackgroundTransparency = 0.3
+titleBar.BackgroundTransparency = 0.5
 titleBar.BorderSizePixel = 0
 titleBar.Parent = frame
 
@@ -577,7 +575,7 @@ local minCorner = Instance.new("UICorner")
 minCorner.CornerRadius = UDim.new(0, 6)
 minCorner.Parent = minBtn
 
--- ========== SCROLLING FRAME ==========
+-- ========== SCROLLING FRAME (BISA SCROLL SAMPAI BAWAH) ==========
 local contentScroll = Instance.new("ScrollingFrame")
 contentScroll.Size = UDim2.new(1, 0, 1, -60)
 contentScroll.Position = UDim2.new(0, 0, 0, 60)
@@ -734,6 +732,36 @@ task.spawn(function()
     end
 end)
 
+-- Tombol Upgrade Manual (opsional)
+local upgradeBtnFrame = Instance.new("Frame")
+upgradeBtnFrame.Size = UDim2.new(1, 0, 0, 34)
+upgradeBtnFrame.BackgroundColor3 = Color3.fromRGB(22, 20, 38)
+upgradeBtnFrame.BackgroundTransparency = 0.2
+upgradeBtnFrame.BorderSizePixel = 0
+upgradeBtnFrame.Parent = contentScroll
+local upgradeBtnCorner = Instance.new("UICorner")
+upgradeBtnCorner.CornerRadius = UDim.new(0, 8)
+upgradeBtnCorner.Parent = upgradeBtnFrame
+
+local upgradeBtn = Instance.new("TextButton")
+upgradeBtn.Size = UDim2.new(1, -10, 1, -6)
+upgradeBtn.Position = UDim2.new(0, 5, 0, 3)
+upgradeBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 200)
+upgradeBtn.Text = "⬆️ MANUAL UPGRADE"
+upgradeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+upgradeBtn.Font = Enum.Font.FredokaOne
+upgradeBtn.TextSize = 11
+upgradeBtn.BorderSizePixel = 0
+upgradeBtn.Parent = upgradeBtnFrame
+local upgradeBtnCorner2 = Instance.new("UICorner")
+upgradeBtnCorner2.CornerRadius = UDim.new(0, 6)
+upgradeBtnCorner2.Parent = upgradeBtn
+
+upgradeBtn.MouseButton1Click:Connect(function()
+    upgrade()
+    print("✅ Manual upgrade executed!")
+end)
+
 -- ========== MINIMIZE FUNCTION ==========
 minBtn.MouseButton1Click:Connect(function()
     isMinimized = not isMinimized
@@ -757,8 +785,10 @@ print("✅ AUTO GUN (0.033s) | AUTO ROLL (0.033s)")
 print("✅ AUTO INDEX (5s) | AUTO UPGRADE (1s)")
 print("✅ AUTO POTION (1s) | AUTO FARM (0.5s)")
 print("✅ AUTO BUY ZONE (BUY DULU, BARU TP)")
+print("✅ TELEPORT KE ZONA TERTINGGI (FIX)")
 print("✅ SIDE LAMP GRADIENT BERJALAN (FULL)")
-print("✅ GARIS PEMISAH ANTAR SECTION")
+print("✅ BACKGROUND LEBIH TRANSPARAN")
+print("✅ BISA SCROLL SAMPAI BAWAH")
 print("✅ ANTI AFK + DELETE AUTOREJOIN")
 print("🚀 SCRIPT SIAP DIGUNAKAN")
 print("═══════════════════════════════════════════")
