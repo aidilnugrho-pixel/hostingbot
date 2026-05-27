@@ -2,7 +2,6 @@
 local replicatedStorage = game:GetService("ReplicatedStorage")
 local players = game:GetService("Players")
 local localPlayer = players.LocalPlayer
-local tweenService = game:GetService("TweenService")
 local virtualUser = game:GetService("VirtualUser")
 
 -- ========== VARIABLE UTAMA ==========
@@ -21,11 +20,9 @@ local autoLuckActive = false
 local autoUltraLuckActive = false
 local autoCurrencyActive = false
 local autoRollSpeedActive = false
-
--- ========== VARIABLE UNTUK AUTO BUY ZONE ==========
 local maxZoneReached = false
 
--- ========== GET REMOTE FUNCTION ==========
+-- ========== GET REMOTE ==========
 local function getRemote(serviceName)
     local success, remote = pcall(function()
         return replicatedStorage:WaitForChild("Packages"):WaitForChild("_Index"):WaitForChild("leifstout_networker@0.3.1"):WaitForChild("networker"):WaitForChild("_remotes"):WaitForChild(serviceName):WaitForChild("RemoteFunction")
@@ -43,19 +40,15 @@ local zonesRemote = getRemote("ZonesService")
 local upgradeRemote = getRemote("UpgradeService")
 local lootRemote = getRemote("LootService")
 
--- ========== AUTO GUN (DELAY 0.033) ==========
+-- ========== AUTO GUN ==========
 local function attackSlime(slimeId)
     if not slimeGunRemote then return end
-    pcall(function()
-        slimeGunRemote:InvokeServer("tryFireSlimeGun", slimeId)
-    end)
+    pcall(function() slimeGunRemote:InvokeServer("tryFireSlimeGun", slimeId) end)
 end
 
 local function findGameplayFolder()
     for _, child in ipairs(workspace:GetChildren()) do
-        if string.match(child.Name, "^Gameplay%d+$") then
-            return child
-        end
+        if string.match(child.Name, "^Gameplay%d+$") then return child end
     end
     return nil
 end
@@ -81,12 +74,10 @@ task.spawn(function()
     end
 end)
 
--- ========== AUTO ROLL (DELAY 0.033) ==========
+-- ========== AUTO ROLL ==========
 local function roll()
     if not rollRemote then return end
-    pcall(function()
-        rollRemote:InvokeServer("requestRoll")
-    end)
+    pcall(function() rollRemote:InvokeServer("requestRoll") end)
 end
 
 task.spawn(function()
@@ -98,13 +89,11 @@ task.spawn(function()
     end
 end)
 
--- ========== AUTO INDEX (DELAY 5 DETIK) ==========
+-- ========== AUTO INDEX ==========
 local function claimIndex()
     if not indexRemote then return end
     for _, kind in ipairs({"basic","big","huge","shiny","inverted"}) do
-        pcall(function()
-            indexRemote:InvokeServer("requestClaimReward", kind)
-        end)
+        pcall(function() indexRemote:InvokeServer("requestClaimReward", kind) end)
         task.wait(0.1)
     end
 end
@@ -118,7 +107,7 @@ task.spawn(function()
     end
 end)
 
--- ========== AUTO FARM LOOT (DELAY 0.5) ==========
+-- ========== AUTO FARM LOOT ==========
 local function pullLootToPlayer()
     local char = localPlayer.Character
     if not char then return end
@@ -129,9 +118,7 @@ local function pullLootToPlayer()
         for _, drop in ipairs(loot:GetChildren()) do
             for _, dropChild in ipairs(drop:GetChildren()) do
                 if dropChild:IsA("BasePart") and dropChild.Name ~= "LootHighlight" then
-                    pcall(function()
-                        dropChild.CFrame = CFrame.new(hrp.Position)
-                    end)
+                    pcall(function() dropChild.CFrame = CFrame.new(hrp.Position) end)
                     task.wait(0.05)
                 end
             end
@@ -148,7 +135,7 @@ task.spawn(function()
     end
 end)
 
--- ========== AUTO FARM FRUIT (DELAY 0.5) ==========
+-- ========== AUTO FARM FRUIT ==========
 local function getAllFruits()
     local fruits = {}
     local locations = {
@@ -178,9 +165,7 @@ end
 
 local function claimFruit(fruitId)
     if not lootRemote then return end
-    pcall(function()
-        lootRemote:InvokeServer("requestCollect", fruitId)
-    end)
+    pcall(function() lootRemote:InvokeServer("requestCollect", fruitId) end)
 end
 
 local function autoCollectFruit()
@@ -203,7 +188,7 @@ task.spawn(function()
     end
 end)
 
--- ========== AUTO UPGRADE (DELAY 1 DETIK) ==========
+-- ========== AUTO UPGRADE ==========
 local function upgrade()
     if not upgradeRemote then return end
     local pg = localPlayer:FindFirstChild("PlayerGui")
@@ -220,9 +205,7 @@ local function upgrade()
                             if tile.Name ~= "UIAspectRatioConstraint" and tile.Name ~= "UpgradeHoverInfo" then
                                 local upgradeName = tile.Name:match("^(%S+)Tile")
                                 if upgradeName then
-                                    pcall(function()
-                                        upgradeRemote:InvokeServer("requestUnlock", upgradeName)
-                                    end)
+                                    pcall(function() upgradeRemote:InvokeServer("requestUnlock", upgradeName) end)
                                     task.wait(0.1)
                                 end
                             end
@@ -243,12 +226,10 @@ task.spawn(function()
     end
 end)
 
--- ========== AUTO REBIRTH (DELAY 5) ==========
+-- ========== AUTO REBIRTH ==========
 local function rebirth()
     if not rebirthRemote then return end
-    pcall(function()
-        rebirthRemote:InvokeServer("requestRebirth")
-    end)
+    pcall(function() rebirthRemote:InvokeServer("requestRebirth") end)
 end
 
 task.spawn(function()
@@ -260,7 +241,7 @@ task.spawn(function()
     end
 end)
 
--- ========== AUTO BUY + BEST ZONE ==========
+-- ========== AUTO BUY ZONE ==========
 local function getBestOpenZone()
     local bestZone = 0
     local zonesFolder = workspace:FindFirstChild("Zones")
@@ -270,9 +251,7 @@ local function getBestOpenZone()
             local gate = zone:FindFirstChild("Gate")
             local blocker = gate and gate:FindFirstChild("ClientGateBlocker_"..zone.Name)
             if not blocker or (blocker and not blocker.CanCollide) then
-                if zoneNum > bestZone then
-                    bestZone = zoneNum
-                end
+                if zoneNum > bestZone then bestZone = zoneNum end
             end
         end
     end
@@ -283,8 +262,7 @@ local function canBuyNextZone()
     local zonesFolder = workspace:FindFirstChild("Zones")
     if not zonesFolder then return false end
     local currentZoneNum = getBestOpenZone()
-    local nextZone = zonesFolder:FindFirstChild(tostring(currentZoneNum + 1))
-    return nextZone ~= nil
+    return zonesFolder:FindFirstChild(tostring(currentZoneNum + 1)) ~= nil
 end
 
 local function tryBuyZone()
@@ -295,9 +273,7 @@ local function tryBuyZone()
         autoBuyZoneActive = false
         return false
     end
-    local success = pcall(function()
-        zonesRemote:InvokeServer("requestPurchaseZone")
-    end)
+    local success = pcall(function() zonesRemote:InvokeServer("requestPurchaseZone") end)
     if not success then
         maxZoneReached = true
         autoBuyZoneActive = false
@@ -313,9 +289,7 @@ local function tryTeleportToBestZone()
         autoBuyZoneActive = false
         return false
     end
-    pcall(function()
-        zonesRemote:InvokeServer("requestTeleportZone", bestZone)
-    end)
+    pcall(function() zonesRemote:InvokeServer("requestTeleportZone", bestZone) end)
     return true
 end
 
@@ -341,12 +315,10 @@ task.spawn(function()
     end
 end)
 
--- ========== AUTO POTIONS (DELAY 1 DETIK) ==========
+-- ========== AUTO POTIONS ==========
 local function useBoost(boostType)
     if not boostRemote then return end
-    pcall(function()
-        boostRemote:InvokeServer("requestUseBoost", boostType)
-    end)
+    pcall(function() boostRemote:InvokeServer("requestUseBoost", boostType) end)
 end
 
 task.spawn(function() while true do if autoLuckActive then useBoost("luck") end task.wait(1) end end)
@@ -384,17 +356,17 @@ end
 deleteAutoRejoinService()
 task.spawn(function() while true do task.wait(10) deleteAutoRejoinService() end end)
 
--- ========== CREATE GUI (BACKGROUND LEBIH TERANG) ==========
+-- ========== CREATE GUI ==========
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "ZAIXPLOIT"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = localPlayer:WaitForChild("PlayerGui")
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 320, 0, 520)
-frame.Position = UDim2.new(0.5, -160, 0.5, -260)
-frame.BackgroundColor3 = Color3.fromRGB(25, 25, 45)  -- LEBIH TERANG
-frame.BackgroundTransparency = 0.55  -- LEBIH TRANSPARAN
+frame.Size = UDim2.new(0, 280, 0, 460)
+frame.Position = UDim2.new(0.5, -140, 0.5, -230)
+frame.BackgroundColor3 = Color3.fromRGB(10, 10, 20)
+frame.BackgroundTransparency = 0.15
 frame.BorderSizePixel = 0
 frame.Active = true
 frame.Draggable = true
@@ -410,7 +382,7 @@ stroke.Transparency = 0.4
 stroke.Thickness = 1
 stroke.Parent = frame
 
--- ========== SIDE LAMP GRADIENT FULL PANJANG ==========
+-- ========== SIDE LAMP PALING PANJANG (60 STRIP) ==========
 local sideLamp = Instance.new("Frame")
 sideLamp.Size = UDim2.new(0, 5, 1, 0)
 sideLamp.Position = UDim2.new(0, -6, 0, 0)
@@ -430,9 +402,9 @@ local colorGradient = {
 }
 
 local strips = {}
-for i = 1, 50 do
+for i = 1, 70 do
     local strip = Instance.new("Frame")
-    strip.Size = UDim2.new(1, 0, 0, 4)
+    strip.Size = UDim2.new(1, 0, 0, 3)
     strip.BackgroundColor3 = colorGradient[(i % #colorGradient) + 1]
     strip.BorderSizePixel = 0
     strip.Parent = sideLamp
@@ -459,8 +431,8 @@ end)
 -- ========== TITLE BAR ==========
 local titleBar = Instance.new("Frame")
 titleBar.Size = UDim2.new(1, 0, 0, 60)
-titleBar.BackgroundColor3 = Color3.fromRGB(30, 28, 50)
-titleBar.BackgroundTransparency = 0.3
+titleBar.BackgroundColor3 = Color3.fromRGB(20, 18, 35)
+titleBar.BackgroundTransparency = 0.2
 titleBar.BorderSizePixel = 0
 titleBar.Parent = frame
 
@@ -587,8 +559,8 @@ end
 local function createToggle(parent, text, emoji, getState, setState)
     local frame = Instance.new("Frame")
     frame.Size = UDim2.new(1, 0, 0, 34)
-    frame.BackgroundColor3 = Color3.fromRGB(30, 28, 48)
-    frame.BackgroundTransparency = 0.3
+    frame.BackgroundColor3 = Color3.fromRGB(22, 20, 38)
+    frame.BackgroundTransparency = 0.2
     frame.BorderSizePixel = 0
     frame.Parent = parent
     local toggleCorner = Instance.new("UICorner")
@@ -600,7 +572,7 @@ local function createToggle(parent, text, emoji, getState, setState)
     label.Position = UDim2.new(0, 10, 0, 0)
     label.BackgroundTransparency = 1
     label.Text = emoji .. " " .. text
-    label.TextColor3 = Color3.fromRGB(220, 220, 250)
+    label.TextColor3 = Color3.fromRGB(210, 210, 240)
     label.Font = Enum.Font.FredokaOne
     label.TextSize = 11
     label.TextXAlignment = Enum.TextXAlignment.Left
@@ -609,7 +581,7 @@ local function createToggle(parent, text, emoji, getState, setState)
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(0, 55, 0, 26)
     btn.Position = UDim2.new(1, -62, 0.5, -13)
-    btn.BackgroundColor3 = getState() and Color3.fromRGB(50, 200, 80) or Color3.fromRGB(55, 50, 75)
+    btn.BackgroundColor3 = getState() and Color3.fromRGB(50, 200, 80) or Color3.fromRGB(45, 40, 65)
     btn.Text = getState() and "ON" or "OFF"
     btn.TextColor3 = Color3.fromRGB(255, 255, 255)
     btn.Font = Enum.Font.FredokaOne
@@ -627,7 +599,7 @@ local function createToggle(parent, text, emoji, getState, setState)
             btn.BackgroundColor3 = Color3.fromRGB(50, 200, 80)
             btn.Text = "ON"
         else
-            btn.BackgroundColor3 = Color3.fromRGB(55, 50, 75)
+            btn.BackgroundColor3 = Color3.fromRGB(45, 40, 65)
             btn.Text = "OFF"
         end
     end)
@@ -707,12 +679,12 @@ end)
 minBtn.MouseButton1Click:Connect(function()
     isMinimized = not isMinimized
     if isMinimized then
-        frame.Size = UDim2.new(0, 320, 0, 60)
+        frame.Size = UDim2.new(0, 280, 0, 60)
         contentScroll.Visible = false
         sideLamp.Visible = false
         minBtn.Text = "+"
     else
-        frame.Size = UDim2.new(0, 320, 0, 520)
+        frame.Size = UDim2.new(0, 280, 0, 460)
         contentScroll.Visible = true
         sideLamp.Visible = true
         minBtn.Text = "−"
@@ -722,8 +694,9 @@ end)
 print("═══════════════════════════════════════════")
 print("   ZAIXPLOIT | SLIME RNG - FINAL")
 print("═══════════════════════════════════════════")
-print("✅ BACKGROUND LEBIH TERANG & TRANSPARAN")
-print("✅ SIDE LAMP FULL PANJANG")
+print("✅ SIDE LAMP 70 STRIP (PALING PANJANG)")
+print("✅ BACKGROUND PEAKET (GAK TEMBUS)")
+print("✅ GUI UKURAN 280x460 (GAK KEGEDEAN)")
 print("✅ SEMUA FITUR LENGKAP")
 print("🚀 SCRIPT SIAP DIGUNAKAN")
 print("═══════════════════════════════════════════")
