@@ -260,16 +260,15 @@ task.spawn(function()
     end
 end)
 
--- ========== AUTO BUY + BEST ZONE (FIX - TELEPORT KE ZONA TERTINGGI) ==========
+-- ========== AUTO BUY + BEST ZONE (FIX) ==========
 
--- Cek zona terbaik yang sudah terbuka (FIX: ambil zona tertinggi)
+-- Cek zona terbaik yang sudah terbuka
 local function getBestOpenZone()
     local bestZone = 0
     local zonesFolder = workspace:FindFirstChild("Zones")
     if zonesFolder then
         for _, zone in ipairs(zonesFolder:GetChildren()) do
             local zoneNum = tonumber(zone.Name) or 0
-            -- Cek apakah zona terbuka (bisa diakses)
             local gate = zone:FindFirstChild("Gate")
             local blocker = gate and gate:FindFirstChild("ClientGateBlocker_"..zone.Name)
             if not blocker or (blocker and not blocker.CanCollide) then
@@ -286,7 +285,6 @@ end
 local function canBuyNextZone()
     local zonesFolder = workspace:FindFirstChild("Zones")
     if not zonesFolder then return false end
-    
     local currentZoneNum = getBestOpenZone()
     local nextZone = zonesFolder:FindFirstChild(tostring(currentZoneNum + 1))
     return nextZone ~= nil
@@ -296,59 +294,42 @@ end
 local function tryBuyZone()
     if not zonesRemote then return false end
     if maxZoneReached then return false end
-    
     if not canBuyNextZone() then
         maxZoneReached = true
         autoBuyZoneActive = false
-        print("✅ [AUTO BUY] Max zone reached! Auto Buy disabled.")
         return false
     end
-    
     local success = pcall(function()
         zonesRemote:InvokeServer("requestPurchaseZone")
     end)
-    
     if not success then
         maxZoneReached = true
         autoBuyZoneActive = false
-        print("✅ [AUTO BUY] Purchase failed! Auto Buy disabled.")
         return false
     end
-    
-    print("✅ [AUTO BUY] Zone purchased!")
     return true
 end
 
--- Teleport ke zona tertinggi yang sudah terbuka (FIX: sekarang ke zona 38 bukan 37)
+-- Teleport ke zona tertinggi
 local function tryTeleportToBestZone()
     if not zonesRemote then return false end
-    
     local bestZone = getBestOpenZone()
-    
     if bestZone == 0 then
         autoBuyZoneActive = false
-        print("✅ [AUTO ZONE] No open zone to teleport! Auto Buy disabled.")
         return false
     end
-    
     pcall(function()
         zonesRemote:InvokeServer("requestTeleportZone", bestZone)
     end)
-    
-    print("✅ [AUTO ZONE] Teleported to zone:", bestZone)
     return true
 end
 
--- LOOP UTAMA (BUY DULU, BARU TP)
 task.spawn(function()
     while true do
         if autoBuyZoneActive then
-            -- Beli zona dulu
             local bought = tryBuyZone()
-            
             if bought then
                 task.wait(1)
-                -- Setelah beli, teleport ke zona tertinggi yang terbuka
                 tryTeleportToBestZone()
             end
         end
@@ -356,13 +337,11 @@ task.spawn(function()
     end
 end)
 
--- Reset flag setiap 2 menit
 task.spawn(function()
     while true do
         task.wait(120)
         if maxZoneReached and canBuyNextZone() then
             maxZoneReached = false
-            print("✅ [AUTO BUY] New zone detected! You can re-enable Auto Buy.")
         end
     end
 end)
@@ -380,14 +359,14 @@ task.spawn(function() while true do if autoUltraLuckActive then useBoost("ultraL
 task.spawn(function() while true do if autoCurrencyActive then useBoost("currency") end task.wait(1) end end)
 task.spawn(function() while true do if autoRollSpeedActive then useBoost("rollSpeed") end task.wait(1) end end)
 
--- ========== ANTI AFK (BACKEND) ==========
+-- ========== ANTI AFK ==========
 localPlayer.Idled:Connect(function()
     virtualUser:Button2Down(Vector2.new(0, 0))
     task.wait(1)
     virtualUser:Button2Up(Vector2.new(0, 0))
 end)
 
--- ========== DELETE AUTOREJOIN (BACKEND) ==========
+-- ========== DELETE AUTOREJOIN ==========
 local function deleteAutoRejoinService()
     local path = replicatedStorage:FindFirstChild("Packages")
     if path then
@@ -417,10 +396,10 @@ screenGui.ResetOnSpawn = false
 screenGui.Parent = localPlayer:WaitForChild("PlayerGui")
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 340, 0, 520)
-frame.Position = UDim2.new(0.5, -170, 0.5, -260)
-frame.BackgroundColor3 = Color3.fromRGB(10, 10, 20)
-frame.BackgroundTransparency = 0.3  -- Lebih transparan
+frame.Size = UDim2.new(0, 320, 0, 500)
+frame.Position = UDim2.new(0.5, -160, 0.5, -250)
+frame.BackgroundColor3 = Color3.fromRGB(8, 8, 18)
+frame.BackgroundTransparency = 0.35
 frame.BorderSizePixel = 0
 frame.Active = true
 frame.Draggable = true
@@ -432,14 +411,14 @@ corner.Parent = frame
 
 local stroke = Instance.new("UIStroke")
 stroke.Color = Color3.fromRGB(0, 200, 255)
-stroke.Transparency = 0.5
+stroke.Transparency = 0.4
 stroke.Thickness = 1
 stroke.Parent = frame
 
--- ========== SIDE LAMP GRADIENT BERJALAN (FULL PANJANG SAMPAI BAWAH) ==========
+-- ========== SIDE LAMP GRADIENT FULL PANJANG ==========
 local sideLamp = Instance.new("Frame")
-sideLamp.Size = UDim2.new(0, 5, 1, -5)  -- Full dari atas ke bawah
-sideLamp.Position = UDim2.new(0, -7, 0, 2)
+sideLamp.Size = UDim2.new(0, 5, 1, 0)
+sideLamp.Position = UDim2.new(0, -6, 0, 0)
 sideLamp.BackgroundTransparency = 1
 sideLamp.BorderSizePixel = 0
 sideLamp.Parent = frame
@@ -451,14 +430,14 @@ local colorGradient = {
     Color3.fromRGB(100, 200, 255),
     Color3.fromRGB(255, 220, 0),
     Color3.fromRGB(255, 180, 0),
-    Color3.fromRGB(40, 40, 50),
-    Color3.fromRGB(20, 20, 30),
+    Color3.fromRGB(40, 40, 55),
+    Color3.fromRGB(20, 20, 35),
 }
 
 local strips = {}
-for i = 1, 30 do  -- Lebih banyak strip untuk full panjang
+for i = 1, 50 do
     local strip = Instance.new("Frame")
-    strip.Size = UDim2.new(1, 0, 0, 5)
+    strip.Size = UDim2.new(1, 0, 0, 4)
     strip.BackgroundColor3 = colorGradient[(i % #colorGradient) + 1]
     strip.BorderSizePixel = 0
     strip.Parent = sideLamp
@@ -467,7 +446,7 @@ end
 
 local sideLayout = Instance.new("UIListLayout")
 sideLayout.FillDirection = Enum.FillDirection.Vertical
-sideLayout.Padding = UDim.new(0, 1)
+sideLayout.Padding = UDim.new(0, 0)
 sideLayout.Parent = sideLamp
 
 local offset = 0
@@ -478,7 +457,7 @@ task.spawn(function()
             strip.BackgroundColor3 = colorGradient[colorIndex]
         end
         offset = offset + 1
-        task.wait(0.1)
+        task.wait(0.08)
     end
 end)
 
@@ -486,7 +465,7 @@ end)
 local titleBar = Instance.new("Frame")
 titleBar.Size = UDim2.new(1, 0, 0, 60)
 titleBar.BackgroundColor3 = Color3.fromRGB(20, 18, 35)
-titleBar.BackgroundTransparency = 0.5
+titleBar.BackgroundTransparency = 0.4
 titleBar.BorderSizePixel = 0
 titleBar.Parent = frame
 
@@ -511,7 +490,7 @@ task.spawn(function()
     end
 end)
 
--- Baris 1 Kiri: ZAIXPLOIT
+-- Baris 1 Kiri
 local titleText = Instance.new("TextLabel")
 titleText.Size = UDim2.new(0.5, 0, 0, 18)
 titleText.Position = UDim2.new(0, 28, 0, 6)
@@ -523,7 +502,7 @@ titleText.TextSize = 14
 titleText.TextXAlignment = Enum.TextXAlignment.Left
 titleText.Parent = titleBar
 
--- Baris 1 Kanan: Nickname
+-- Baris 1 Kanan
 local nickText = Instance.new("TextLabel")
 nickText.Size = UDim2.new(0.5, -50, 0, 18)
 nickText.Position = UDim2.new(0.5, 0, 0, 6)
@@ -535,7 +514,7 @@ nickText.TextSize = 12
 nickText.TextXAlignment = Enum.TextXAlignment.Right
 nickText.Parent = titleBar
 
--- Baris 2 Kiri: SLIME RNG
+-- Baris 2 Kiri
 local subTitleText = Instance.new("TextLabel")
 subTitleText.Size = UDim2.new(0.5, 0, 0, 12)
 subTitleText.Position = UDim2.new(0, 28, 0, 26)
@@ -547,7 +526,7 @@ subTitleText.TextSize = 10
 subTitleText.TextXAlignment = Enum.TextXAlignment.Left
 subTitleText.Parent = titleBar
 
--- Baris 2 Kanan: Username
+-- Baris 2 Kanan
 local userText = Instance.new("TextLabel")
 userText.Size = UDim2.new(0.5, -50, 0, 12)
 userText.Position = UDim2.new(0.5, 0, 0, 26)
@@ -575,7 +554,7 @@ local minCorner = Instance.new("UICorner")
 minCorner.CornerRadius = UDim.new(0, 6)
 minCorner.Parent = minBtn
 
--- ========== SCROLLING FRAME (BISA SCROLL SAMPAI BAWAH) ==========
+-- ========== SCROLLING FRAME ==========
 local contentScroll = Instance.new("ScrollingFrame")
 contentScroll.Size = UDim2.new(1, 0, 1, -60)
 contentScroll.Position = UDim2.new(0, 0, 0, 60)
@@ -598,7 +577,7 @@ padding.PaddingTop = UDim.new(0, 8)
 padding.PaddingBottom = UDim.new(0, 8)
 padding.Parent = contentScroll
 
--- ========== FUNGSI MEMBUAT GARIS ==========
+-- ========== FUNGSI GARIS ==========
 local function addSeparator(parent)
     local line = Instance.new("Frame")
     line.Size = UDim2.new(1, 0, 0, 1)
@@ -668,7 +647,6 @@ addSeparator(contentScroll)
 createToggle(contentScroll, "Auto Roll", "🎲", function() return autoRollActive end, function(v) autoRollActive = v end)
 addSeparator(contentScroll)
 
--- Utility Section Title
 local utilTitle = Instance.new("TextLabel")
 utilTitle.Size = UDim2.new(1, 0, 0, 24)
 utilTitle.BackgroundTransparency = 1
@@ -686,7 +664,6 @@ createToggle(contentScroll, "Auto Rebirth", "🔄", function() return autoRebirt
 createToggle(contentScroll, "Auto Buy + Best Zone", "🏪", function() return autoBuyZoneActive end, function(v) autoBuyZoneActive = v end)
 addSeparator(contentScroll)
 
--- Potion Section Title
 local potTitle = Instance.new("TextLabel")
 potTitle.Size = UDim2.new(1, 0, 0, 24)
 potTitle.BackgroundTransparency = 1
@@ -703,7 +680,6 @@ createToggle(contentScroll, "Currency Potion", "💵", function() return autoCur
 createToggle(contentScroll, "Roll Speed Potion", "⚡", function() return autoRollSpeedActive end, function(v) autoRollSpeedActive = v end)
 addSeparator(contentScroll)
 
--- Zone Status
 local zoneStatus = Instance.new("TextLabel")
 zoneStatus.Size = UDim2.new(1, 0, 0, 18)
 zoneStatus.BackgroundTransparency = 1
@@ -732,46 +708,16 @@ task.spawn(function()
     end
 end)
 
--- Tombol Upgrade Manual (opsional)
-local upgradeBtnFrame = Instance.new("Frame")
-upgradeBtnFrame.Size = UDim2.new(1, 0, 0, 34)
-upgradeBtnFrame.BackgroundColor3 = Color3.fromRGB(22, 20, 38)
-upgradeBtnFrame.BackgroundTransparency = 0.2
-upgradeBtnFrame.BorderSizePixel = 0
-upgradeBtnFrame.Parent = contentScroll
-local upgradeBtnCorner = Instance.new("UICorner")
-upgradeBtnCorner.CornerRadius = UDim.new(0, 8)
-upgradeBtnCorner.Parent = upgradeBtnFrame
-
-local upgradeBtn = Instance.new("TextButton")
-upgradeBtn.Size = UDim2.new(1, -10, 1, -6)
-upgradeBtn.Position = UDim2.new(0, 5, 0, 3)
-upgradeBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 200)
-upgradeBtn.Text = "⬆️ MANUAL UPGRADE"
-upgradeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-upgradeBtn.Font = Enum.Font.FredokaOne
-upgradeBtn.TextSize = 11
-upgradeBtn.BorderSizePixel = 0
-upgradeBtn.Parent = upgradeBtnFrame
-local upgradeBtnCorner2 = Instance.new("UICorner")
-upgradeBtnCorner2.CornerRadius = UDim.new(0, 6)
-upgradeBtnCorner2.Parent = upgradeBtn
-
-upgradeBtn.MouseButton1Click:Connect(function()
-    upgrade()
-    print("✅ Manual upgrade executed!")
-end)
-
--- ========== MINIMIZE FUNCTION ==========
+-- ========== MINIMIZE ==========
 minBtn.MouseButton1Click:Connect(function()
     isMinimized = not isMinimized
     if isMinimized then
-        frame.Size = UDim2.new(0, 340, 0, 60)
+        frame.Size = UDim2.new(0, 320, 0, 60)
         contentScroll.Visible = false
         sideLamp.Visible = false
         minBtn.Text = "+"
     else
-        frame.Size = UDim2.new(0, 340, 0, 520)
+        frame.Size = UDim2.new(0, 320, 0, 500)
         contentScroll.Visible = true
         sideLamp.Visible = true
         minBtn.Text = "−"
@@ -781,14 +727,9 @@ end)
 print("═══════════════════════════════════════════")
 print("   ZAIXPLOIT | SLIME RNG - FINAL")
 print("═══════════════════════════════════════════")
-print("✅ AUTO GUN (0.033s) | AUTO ROLL (0.033s)")
-print("✅ AUTO INDEX (5s) | AUTO UPGRADE (1s)")
-print("✅ AUTO POTION (1s) | AUTO FARM (0.5s)")
-print("✅ AUTO BUY ZONE (BUY DULU, BARU TP)")
-print("✅ TELEPORT KE ZONA TERTINGGI (FIX)")
-print("✅ SIDE LAMP GRADIENT BERJALAN (FULL)")
+print("✅ SIDE LAMP FULL PANJANG SAMPAI BAWAH")
+print("✅ GRADIENT BERJALAN (BIRU-KUNING-HITAM)")
 print("✅ BACKGROUND LEBIH TRANSPARAN")
-print("✅ BISA SCROLL SAMPAI BAWAH")
-print("✅ ANTI AFK + DELETE AUTOREJOIN")
+print("✅ BISA SCROLL KE BAWAH")
 print("🚀 SCRIPT SIAP DIGUNAKAN")
 print("═══════════════════════════════════════════")
