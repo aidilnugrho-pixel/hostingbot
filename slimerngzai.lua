@@ -1,239 +1,77 @@
--- ========== SERVICES ==========
-local replicatedStorage = game:GetService("ReplicatedStorage")
-local players = game:GetService("Players")
-local localPlayer = players.LocalPlayer
-local virtualUser = game:GetService("VirtualUser")
+local RepStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local VirtualUser = game:GetService("VirtualUser")
 
--- ========== VARIABLE UTAMA ==========
 local isMinimized = false
 
--- ========== FITUR TOGGLE STATE ==========
-local autoGunActive = true
-local autoRollActive = true
-local autoIndexActive = false
-local autoFarmLootActive = false
-local autoFarmFruitActive = false
-local autoUpgradeActive = false
-local autoRebirthActive = false
-local autoBuyZoneActive = false
-local autoBestZoneActive = false
-local autoLuckActive = false
-local autoUltraLuckActive = false
-local autoCurrencyActive = false
-local autoRollSpeedActive = false
-local maxZoneReached = false
+local AutoGunMode = 1
+local AutoRollMode = 1
+local GunDelay = 0.1
+local RollDelay = 0.1
 
--- ========== GET REMOTE ==========
-local function getRemote(serviceName)
-    local success, remote = pcall(function()
-        return replicatedStorage:WaitForChild("Packages"):WaitForChild("_Index"):WaitForChild("leifstout_networker@0.3.1"):WaitForChild("networker"):WaitForChild("_remotes"):WaitForChild(serviceName):WaitForChild("RemoteFunction")
+local AutoIndex = false
+local AutoFarmLoot = false
+local AutoUpgrade = false
+local AutoRebirth = false
+local AutoBuyZone = false
+local AutoLuck = false
+local AutoUltraLuck = false
+local AutoCurrency = false
+local AutoRollSpeed = false
+
+local function GetRemote(Name)
+    local Success, Remote = pcall(function()
+        return RepStorage:WaitForChild("Packages"):WaitForChild("_Index"):WaitForChild("leifstout_networker@0.3.1"):WaitForChild("networker"):WaitForChild("_remotes"):WaitForChild(Name):WaitForChild("RemoteFunction")
     end)
-    if success then return remote end
-    return nil
+    return Success and Remote or nil
 end
 
-local slimeGunRemote = getRemote("SlimeGunService")
-local rollRemote = getRemote("RollService")
-local indexRemote = getRemote("IndexService")
-local boostRemote = getRemote("BoostService")
-local rebirthRemote = getRemote("RebirthService")
-local zonesRemote = getRemote("ZonesService")
-local upgradeRemote = getRemote("UpgradeService")
-local lootRemote = getRemote("LootService")
+local SlimeGun = GetRemote("SlimeGunService")
+local RollSvc = GetRemote("RollService")
+local IndexSvc = GetRemote("IndexService")
+local BoostSvc = GetRemote("BoostService")
+local RebirthSvc = GetRemote("RebirthService")
+local ZonesSvc = GetRemote("ZonesService")
+local UpgradeSvc = GetRemote("UpgradeService")
+local LootSvc = GetRemote("LootService")
 
--- ========== ZONE FUNCTIONS ==========
-local function buyZone()
-    if not zonesRemote then return false end
-    local success = pcall(function()
-        zonesRemote:InvokeServer("requestPurchaseZone")
-    end)
-    return success
-end
-
-local function teleportToZone(zoneNumber)
-    if not zonesRemote or not zoneNumber or zoneNumber <= 0 then return false end
-    local success = pcall(function()
-        zonesRemote:InvokeServer("requestTeleportZone", zoneNumber)
-    end)
-    return success
-end
-
--- Cek apakah zona terbuka (MULTI METHOD)
-local function isZoneOpen(zone)
-    local zoneNum = tonumber(zone.Name)
-    if not zoneNum then return false end
-    
-    -- METHOD 1: Cek POI.Hitbox
-    local poi = zone:FindFirstChild("POI")
-    if poi then
-        local hitbox = poi:FindFirstChild("Hitbox")
-        if hitbox and hitbox:IsA("BasePart") then
-            return true
-        end
-    end
-    
-    -- METHOD 2: Cek Gate ClientGateBlocker
-    local gate = zone:FindFirstChild("Gate")
-    if gate then
-        local blocker = gate:FindFirstChild("ClientGateBlocker_" .. zoneNum)
-        if blocker and not blocker.CanCollide then
-            return true
-        end
-        
-        -- METHOD 3: Cek DepthFade
-        local depthFade = gate:FindFirstChild("DepthFade")
-        if depthFade and depthFade.Enabled == false then
-            return true
-        end
-    end
-    
-    -- METHOD 4: Cek part dengan CanCollide false
-    for _, child in ipairs(zone:GetDescendants()) do
-        if child:IsA("BasePart") and child.CanCollide == false then
-            return true
-        end
-    end
-    
-    return false
-end
-
--- Ambil best zone (zona tertinggi yang terbuka)
-local function getBestOpenZone()
-    local bestZone = 0
-    local zonesFolder = workspace:FindFirstChild("Zones")
-    
-    if not zonesFolder then
-        return 0
-    end
-    
-    for _, zone in ipairs(zonesFolder:GetChildren()) do
-        local zoneNum = tonumber(zone.Name)
-        if zoneNum and zoneNum > 0 and isZoneOpen(zone) then
-            if zoneNum > bestZone then
-                bestZone = zoneNum
-            end
-        end
-    end
-    
-    return bestZone
-end
-
--- Ambil posisi player saat ini di zona berapa
-local function getCurrentPlayerZone()
-    local character = localPlayer.Character
-    if not character then return 0 end
-    
-    local hrp = character:FindFirstChild("HumanoidRootPart")
-    if not hrp then return 0 end
-    
-    local playerPos = hrp.Position
-    local zonesFolder = workspace:FindFirstChild("Zones")
-    
-    if not zonesFolder then return 0 end
-    
-    for _, zone in ipairs(zonesFolder:GetChildren()) do
-        local zoneNum = tonumber(zone.Name)
-        if zoneNum and zoneNum > 0 then
-            local poi = zone:FindFirstChild("POI")
-            if poi then
-                local hitbox = poi:FindFirstChild("Hitbox")
-                if hitbox and hitbox:IsA("BasePart") then
-                    local hitboxPos = hitbox.Position
-                    local hitboxSize = hitbox.Size
-                    local halfX = hitboxSize.X / 2
-                    local halfZ = hitboxSize.Z / 2
-                    
-                    if math.abs(playerPos.X - hitboxPos.X) <= halfX and
-                       math.abs(playerPos.Z - hitboxPos.Z) <= halfZ then
-                        return zoneNum
-                    end
-                end
-            end
-        end
-    end
-    
-    return 0
-end
-
--- ========== AUTO GUN ==========
-local function attackSlime(slimeId)
-    if not slimeGunRemote then return end
-    pcall(function() slimeGunRemote:InvokeServer("tryFireSlimeGun", slimeId) end)
-end
-
-local function findGameplayFolder()
-    for _, child in ipairs(workspace:GetChildren()) do
-        if string.match(child.Name, "^Gameplay%d+$") then return child end
+local function FindGameplay()
+    for _, Child in ipairs(workspace:GetChildren()) do
+        if string.match(Child.Name, "^Gameplay%d+$") then return Child end
     end
     return nil
 end
 
-task.spawn(function()
-    while true do
-        if autoGunActive then
-            local gameplay = findGameplayFolder()
-            if gameplay then
-                local enemiesFolder = gameplay:FindFirstChild("Enemies")
-                if enemiesFolder then
-                    for _, enemy in ipairs(enemiesFolder:GetChildren()) do
-                        local slimeId = tonumber(enemy.Name)
-                        if slimeId then
-                            attackSlime(slimeId)
-                            task.wait(0.033)
-                        end
-                    end
-                end
-            end
-        end
-        task.wait(0.033)
-    end
-end)
-
--- ========== AUTO ROLL ==========
-local function roll()
-    if not rollRemote then return end
-    pcall(function() rollRemote:InvokeServer("requestRoll") end)
+local function AttackSlime(Id)
+    if not SlimeGun then return end
+    pcall(function() SlimeGun:InvokeServer("tryFireSlimeGun", Id) end)
 end
 
-task.spawn(function()
-    while true do
-        if autoRollActive then
-            roll()
-        end
-        task.wait(0.033)
-    end
-end)
+local function Roll()
+    if not RollSvc then return end
+    pcall(function() RollSvc:InvokeServer("requestRoll") end)
+end
 
--- ========== AUTO INDEX ==========
-local function claimIndex()
-    if not indexRemote then return end
-    for _, kind in ipairs({"basic","big","huge","shiny","inverted"}) do
-        pcall(function() indexRemote:InvokeServer("requestClaimReward", kind) end)
+local function ClaimIndex()
+    if not IndexSvc then return end
+    for _, Kind in ipairs({"basic","big","huge","shiny","inverted"}) do
+        pcall(function() IndexSvc:InvokeServer("requestClaimReward", Kind) end)
         task.wait(0.1)
     end
 end
 
-task.spawn(function()
-    while true do
-        if autoIndexActive then
-            claimIndex()
-        end
-        task.wait(5)
-    end
-end)
-
--- ========== AUTO FARM LOOT ==========
-local function pullLootToPlayer()
-    local char = localPlayer.Character
-    if not char then return end
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
-    local loot = workspace:FindFirstChild("Loot")
-    if loot then
-        for _, drop in ipairs(loot:GetChildren()) do
-            for _, dropChild in ipairs(drop:GetChildren()) do
-                if dropChild:IsA("BasePart") and dropChild.Name ~= "LootHighlight" then
-                    pcall(function() dropChild.CFrame = CFrame.new(hrp.Position) end)
+local function PullLoot()
+    local Char = LocalPlayer.Character
+    if not Char then return end
+    local HRP = Char:FindFirstChild("HumanoidRootPart")
+    if not HRP then return end
+    local LootFolder = workspace:FindFirstChild("Loot")
+    if LootFolder then
+        for _, Drop in ipairs(LootFolder:GetChildren()) do
+            for _, Part in ipairs(Drop:GetChildren()) do
+                if Part:IsA("BasePart") and Part.Name ~= "LootHighlight" then
+                    pcall(function() Part.CFrame = CFrame.new(HRP.Position) end)
                     task.wait(0.05)
                 end
             end
@@ -241,541 +79,552 @@ local function pullLootToPlayer()
     end
 end
 
-task.spawn(function()
-    while true do
-        if autoFarmLootActive then
-            pullLootToPlayer()
+local function Upgrade()
+    if not UpgradeSvc then return end
+    local PG = LocalPlayer:FindFirstChild("PlayerGui")
+    if not PG then return end
+    local Root = PG:FindFirstChild("Root")
+    if not Root then return end
+    local UpgradeScreen = Root:FindFirstChild("UpgradeScreen")
+    if not UpgradeScreen then return end
+    local UpgradeContent = UpgradeScreen:FindFirstChild("UpgradeContent")
+    if not UpgradeContent then return end
+    local Frame = UpgradeContent:FindFirstChild("Frame")
+    if not Frame then return end
+    for _, Tile in ipairs(Frame:GetChildren()) do
+        if Tile.Name ~= "UIAspectRatioConstraint" and Tile.Name ~= "UpgradeHoverInfo" then
+            local UpgradeName = Tile.Name:match("^(%S+)Tile")
+            if UpgradeName then
+                pcall(function() UpgradeSvc:InvokeServer("requestUnlock", UpgradeName) end)
+                task.wait(0.1)
+            end
         end
-        task.wait(0.5)
     end
-end)
+end
 
--- ========== AUTO FARM FRUIT ==========
-local function getAllFruits()
-    local fruits = {}
-    local locations = {
-        workspace:FindFirstChild("DroppedFruits"),
-        workspace:FindFirstChild("Fruits"),
-        workspace:FindFirstChild("Loot"),
-        workspace:FindFirstChild("Drops")
-    }
-    for _, loc in pairs(locations) do
-        if loc then
-            for _, child in pairs(loc:GetChildren()) do
-                if child:IsA("Model") or child:IsA("BasePart") then
-                    table.insert(fruits, child)
+local function Rebirth()
+    if not RebirthSvc then return end
+    pcall(function() RebirthSvc:InvokeServer("requestRebirth") end)
+end
+
+local function TeleportZone(ZoneNum)
+    if not ZonesSvc then return end
+    pcall(function() ZonesSvc:InvokeServer("requestTeleportZone", ZoneNum) end)
+end
+
+local function GetBestOpenZone()
+    local Best = 0
+    local Zones = workspace:FindFirstChild("Zones")
+    if Zones then
+        for _, Zone in ipairs(Zones:GetChildren()) do
+            local Num = tonumber(Zone.Name) or 0
+            if Num > 0 then
+                local Gate = Zone:FindFirstChild("Gate")
+                local Blocker = Gate and Gate:FindFirstChild("ClientGateBlocker_"..Num)
+                if Blocker and not Blocker.CanCollide and Num > Best then
+                    Best = Num
                 end
             end
         end
     end
-    return fruits
+    return Best
 end
 
-local function getFruitId(fruit)
-    local id = fruit:GetAttribute("LootId") or fruit:GetAttribute("Id") or fruit:GetAttribute("UUID")
-    if not id and #fruit.Name == 36 then id = fruit.Name end
-    if not id and fruit:FindFirstChild("Value") then id = fruit.Value.Value end
-    return id
-end
-
-local function claimFruit(fruitId)
-    if not lootRemote then return end
-    pcall(function() lootRemote:InvokeServer("requestCollect", fruitId) end)
-end
-
-local function autoCollectFruit()
-    local fruits = getAllFruits()
-    for _, fruit in pairs(fruits) do
-        local id = getFruitId(fruit)
-        if id then
-            claimFruit(id)
+local function BuyZoneAndTeleport()
+    if not ZonesSvc then return end
+    
+    local ZoneBefore = GetBestOpenZone()
+    local TargetZone = ZoneBefore + 1
+    
+    local Success = pcall(function()
+        ZonesSvc:InvokeServer("requestPurchaseZone")
+    end)
+    
+    if Success then
+        task.wait(1)
+        
+        local targetZoneFolder = workspace:FindFirstChild("Zones") and 
+                                 workspace.Zones:FindFirstChild(tostring(TargetZone))
+        
+        if targetZoneFolder then
+            local gate = targetZoneFolder:FindFirstChild("Gate")
+            if gate and gate:FindFirstChild("DepthFade") then
+                TeleportZone(TargetZone)
+            else
+                local BestZone = GetBestOpenZone()
+                if BestZone > 0 then
+                    TeleportZone(BestZone)
+                end
+            end
+        else
+            local BestZone = GetBestOpenZone()
+            if BestZone > 0 then
+                TeleportZone(BestZone)
+            end
         end
-        task.wait(0.1)
     end
+end
+
+local function UseBoost(Type)
+    if not BoostSvc then return end
+    pcall(function() BoostSvc:InvokeServer("requestUseBoost", Type) end)
 end
 
 task.spawn(function()
     while true do
-        if autoFarmFruitActive then
-            autoCollectFruit()
-        end
-        task.wait(0.5)
-    end
-end)
-
--- ========== AUTO UPGRADE ==========
-local function upgrade()
-    if not upgradeRemote then return end
-    local pg = localPlayer:FindFirstChild("PlayerGui")
-    if pg then
-        local root = pg:FindFirstChild("Root")
-        if root then
-            local us = root:FindFirstChild("UpgradeScreen")
-            if us then
-                local uc = us:FindFirstChild("UpgradeContent")
-                if uc then
-                    local fr = uc:FindFirstChild("Frame")
-                    if fr then
-                        for _, tile in ipairs(fr:GetChildren()) do
-                            if tile.Name ~= "UIAspectRatioConstraint" and tile.Name ~= "UpgradeHoverInfo" then
-                                local upgradeName = tile.Name:match("^(%S+)Tile")
-                                if upgradeName then
-                                    pcall(function() upgradeRemote:InvokeServer("requestUnlock", upgradeName) end)
-                                    task.wait(0.1)
-                                end
-                            end
+        if AutoGunMode > 0 then
+            local Gameplay = FindGameplay()
+            if Gameplay then
+                local Enemies = Gameplay:FindFirstChild("Enemies")
+                if Enemies then
+                    for _, Enemy in ipairs(Enemies:GetChildren()) do
+                        local Id = tonumber(Enemy.Name)
+                        if Id then
+                            AttackSlime(Id)
+                            task.wait(GunDelay)
                         end
                     end
                 end
             end
         end
-    end
-end
-
-task.spawn(function()
-    while true do
-        if autoUpgradeActive then
-            upgrade()
-        end
-        task.wait(1)
+        task.wait(GunDelay)
     end
 end)
 
--- ========== AUTO REBIRTH ==========
-local function rebirth()
-    if not rebirthRemote then return end
-    pcall(function() rebirthRemote:InvokeServer("requestRebirth") end)
-end
-
 task.spawn(function()
     while true do
-        if autoRebirthActive then
-            rebirth()
-        end
-        task.wait(5)
+        if AutoRollMode > 0 then Roll() end
+        task.wait(RollDelay)
     end
 end)
 
--- ========== AUTO BUY ZONE ==========
-task.spawn(function()
-    while true do
-        if autoBuyZoneActive and not maxZoneReached then
-            local bestZone = getBestOpenZone()
-            local zonesFolder = workspace:FindFirstChild("Zones")
-            if zonesFolder and zonesFolder:FindFirstChild(tostring(bestZone + 1)) then
-                local success = buyZone()
-                if not success then
-                    maxZoneReached = true
-                    autoBuyZoneActive = false
-                end
-                task.wait(1)
-            else
-                maxZoneReached = true
-                autoBuyZoneActive = false
-            end
-        end
-        task.wait(5)
-    end
-end)
+task.spawn(function() while true do if AutoIndex then ClaimIndex() end task.wait(5) end end)
+task.spawn(function() while true do if AutoFarmLoot then PullLoot() end task.wait(0.5) end end)
+task.spawn(function() while true do if AutoUpgrade then Upgrade() end task.wait(1) end end)
+task.spawn(function() while true do if AutoRebirth then Rebirth() end task.wait(5) end end)
+task.spawn(function() while true do if AutoBuyZone then BuyZoneAndTeleport() end task.wait(30) end end)
 
--- ========== AUTO BEST ZONE ==========
-task.spawn(function()
-    while true do
-        if autoBestZoneActive then
-            local bestZone = getBestOpenZone()
-            local currentZone = getCurrentPlayerZone()
-            
-            if bestZone > 0 and currentZone < bestZone then
-                teleportToZone(bestZone)
-            end
-        end
-        task.wait(3)
-    end
-end)
+task.spawn(function() while true do if AutoLuck then UseBoost("luck") end task.wait(1) end end)
+task.spawn(function() while true do if AutoUltraLuck then UseBoost("ultraLuck") end task.wait(1) end end)
+task.spawn(function() while true do if AutoCurrency then UseBoost("currency") end task.wait(1) end end)
+task.spawn(function() while true do if AutoRollSpeed then UseBoost("rollSpeed") end task.wait(1) end end)
 
--- ========== AUTO POTIONS ==========
-local function useBoost(boostType)
-    if not boostRemote then return end
-    pcall(function() boostRemote:InvokeServer("requestUseBoost", boostType) end)
-end
-
-task.spawn(function() while true do if autoLuckActive then useBoost("luck") end task.wait(1) end end)
-task.spawn(function() while true do if autoUltraLuckActive then useBoost("ultraLuck") end task.wait(1) end end)
-task.spawn(function() while true do if autoCurrencyActive then useBoost("currency") end task.wait(1) end end)
-task.spawn(function() while true do if autoRollSpeedActive then useBoost("rollSpeed") end task.wait(1) end end)
-
--- ========== ANTI AFK ==========
-localPlayer.Idled:Connect(function()
-    virtualUser:Button2Down(Vector2.new(0, 0))
+LocalPlayer.Idled:Connect(function()
+    VirtualUser:Button2Down(Vector2.new(0, 0))
     task.wait(1)
-    virtualUser:Button2Up(Vector2.new(0, 0))
+    VirtualUser:Button2Up(Vector2.new(0, 0))
 end)
 
--- ========== DELETE AUTOREJOIN ==========
-local function deleteAutoRejoinService()
-    local path = replicatedStorage:FindFirstChild("Packages")
-    if path then
-        local index = path:FindFirstChild("_Index")
-        if index then
-            local netFolder = index:FindFirstChild("leifstout_networker@0.3.1")
-            if netFolder then
-                local networker = netFolder:FindFirstChild("networker")
-                if networker then
-                    local remotes = networker:FindFirstChild("_remotes")
-                    if remotes then
-                        local autoRejoin = remotes:FindFirstChild("AutoRejoinService")
-                        if autoRejoin then autoRejoin:Destroy() end
+local function DeleteAutoRejoin()
+    local Path = RepStorage:FindFirstChild("Packages")
+    if Path then
+        local Index = Path:FindFirstChild("_Index")
+        if Index then
+            local Net = Index:FindFirstChild("leifstout_networker@0.3.1")
+            if Net then
+                local NW = Net:FindFirstChild("networker")
+                if NW then
+                    local Remotes = NW:FindFirstChild("_remotes")
+                    if Remotes then
+                        local AR = Remotes:FindFirstChild("AutoRejoinService")
+                        if AR then AR:Destroy() end
                     end
                 end
             end
         end
     end
 end
-deleteAutoRejoinService()
-task.spawn(function() while true do task.wait(10) deleteAutoRejoinService() end end)
+DeleteAutoRejoin()
+task.spawn(function() while true do task.wait(10) DeleteAutoRejoin() end end)
 
--- ========== CREATE GUI ==========
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "ZAIXPLOIT"
-screenGui.ResetOnSpawn = false
-screenGui.Parent = localPlayer:WaitForChild("PlayerGui")
+local GUI = Instance.new("ScreenGui")
+GUI.Name = "ZAIXPLOIT"
+GUI.ResetOnSpawn = false
+GUI.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
-local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 280, 0, 440)
-frame.Position = UDim2.new(0.5, -140, 0.5, -220)
-frame.BackgroundColor3 = Color3.fromRGB(8, 8, 18)
-frame.BackgroundTransparency = 0.25
-frame.BorderSizePixel = 0
-frame.Active = true
-frame.Draggable = true
-frame.Parent = screenGui
+local Main = Instance.new("Frame")
+Main.Size = UDim2.new(0, 210, 0, 320)
+Main.Position = UDim2.new(0.5, -105, 0.5, -160)
+Main.BackgroundColor3 = Color3.fromRGB(8, 6, 15)
+Main.BackgroundTransparency = 0.05
+Main.BorderSizePixel = 0
+Main.Active = true
+Main.Draggable = true
+Main.Parent = GUI
 
-local corner = Instance.new("UICorner")
-corner.CornerRadius = UDim.new(0, 12)
-corner.Parent = frame
+local UIGradient = Instance.new("UIGradient")
+UIGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(5, 5, 15)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(10, 20, 50)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(30, 80, 150)),
+})
+UIGradient.Rotation = 90
+UIGradient.Parent = Main
 
-local stroke = Instance.new("UIStroke")
-stroke.Color = Color3.fromRGB(0, 200, 255)
-stroke.Transparency = 0.3
-stroke.Thickness = 1
-stroke.Parent = frame
+local Corner = Instance.new("UICorner")
+Corner.CornerRadius = UDim.new(0, 6)
+Corner.Parent = Main
 
--- ========== SIDE LAMP GRADIENT ==========
-local sideLamp = Instance.new("Frame")
-sideLamp.Size = UDim2.new(0, 6, 1, -5)
-sideLamp.Position = UDim2.new(0, 2, 0, 5)
-sideLamp.BackgroundTransparency = 1
-sideLamp.BorderSizePixel = 0
-sideLamp.ZIndex = 10
-sideLamp.Parent = frame
+local Stroke = Instance.new("UIStroke")
+Stroke.Color = Color3.fromRGB(0, 150, 255)
+Stroke.Transparency = 0.3
+Stroke.Thickness = 1
+Stroke.Parent = Main
 
-local colorGradient = {
-    Color3.fromRGB(0, 80, 255),
-    Color3.fromRGB(0, 130, 255),
-    Color3.fromRGB(0, 180, 255),
-    Color3.fromRGB(100, 200, 255),
-    Color3.fromRGB(255, 220, 0),
-    Color3.fromRGB(255, 180, 0),
-    Color3.fromRGB(40, 40, 55),
-    Color3.fromRGB(20, 20, 35),
+local SideLamp = Instance.new("Frame")
+SideLamp.Size = UDim2.new(0, 4, 1, -8)
+SideLamp.Position = UDim2.new(0, 2, 0, 4)
+SideLamp.BackgroundTransparency = 1
+SideLamp.BorderSizePixel = 0
+SideLamp.Parent = Main
+
+local SideCorner = Instance.new("UICorner")
+SideCorner.CornerRadius = UDim.new(0, 2)
+SideCorner.Parent = SideLamp
+
+local SideLayout = Instance.new("UIListLayout")
+SideLayout.FillDirection = Enum.FillDirection.Vertical
+SideLayout.Padding = UDim.new(0, 0)
+SideLayout.Parent = SideLamp
+
+local NeonColors = {
+    Color3.fromRGB(0, 50, 200),
+    Color3.fromRGB(0, 100, 230),
+    Color3.fromRGB(0, 150, 255),
+    Color3.fromRGB(80, 180, 255),
+    Color3.fromRGB(0, 150, 255),
+    Color3.fromRGB(0, 100, 230),
+    Color3.fromRGB(0, 50, 200),
 }
 
-local strips = {}
-for i = 1, 100 do
-    local strip = Instance.new("Frame")
-    strip.Size = UDim2.new(1, 0, 0, 3)
-    strip.BackgroundColor3 = colorGradient[(i % #colorGradient) + 1]
-    strip.BorderSizePixel = 0
-    strip.ZIndex = 10
-    strip.Parent = sideLamp
-    table.insert(strips, strip)
+local Strips = {}
+for i = 1, 40 do
+    local Strip = Instance.new("Frame")
+    Strip.Size = UDim2.new(1, 0, 0, 8)
+    Strip.BackgroundColor3 = NeonColors[1]
+    Strip.BorderSizePixel = 0
+    Strip.Parent = SideLamp
+    table.insert(Strips, Strip)
 end
 
-local sideLayout = Instance.new("UIListLayout")
-sideLayout.FillDirection = Enum.FillDirection.Vertical
-sideLayout.Padding = UDim.new(0, 0)
-sideLayout.Parent = sideLamp
-
-local offset = 0
+local Offset = 0
 task.spawn(function()
     while true do
-        for i, strip in ipairs(strips) do
-            local colorIndex = (i + offset) % #colorGradient + 1
-            strip.BackgroundColor3 = colorGradient[colorIndex]
+        Offset = Offset + 1
+        for i, Strip in ipairs(Strips) do
+            local ColorIndex = (i + Offset) % #NeonColors + 1
+            if ColorIndex == 0 then ColorIndex = 1 end
+            Strip.BackgroundColor3 = NeonColors[ColorIndex]
         end
-        offset = offset + 1
-        task.wait(0.05)
+        task.wait(0.08)
     end
 end)
 
--- ========== TITLE BAR ==========
-local titleBar = Instance.new("Frame")
-titleBar.Size = UDim2.new(1, 0, 0, 55)
-titleBar.BackgroundColor3 = Color3.fromRGB(20, 18, 35)
-titleBar.BackgroundTransparency = 0.2
-titleBar.BorderSizePixel = 0
-titleBar.Parent = frame
+local TitleBar = Instance.new("Frame")
+TitleBar.Size = UDim2.new(1, 0, 0, 35)
+TitleBar.BackgroundColor3 = Color3.fromRGB(15, 13, 25)
+TitleBar.BackgroundTransparency = 0.3
+TitleBar.BorderSizePixel = 0
+TitleBar.Parent = Main
 
-local titleCorner = Instance.new("UICorner")
-titleCorner.CornerRadius = UDim.new(0, 12)
-titleCorner.Parent = titleBar
+local TitleCorner = Instance.new("UICorner")
+TitleCorner.CornerRadius = UDim.new(0, 6)
+TitleCorner.Parent = TitleBar
 
-local indicatorLight = Instance.new("Frame")
-indicatorLight.Size = UDim2.new(0, 8, 0, 8)
-indicatorLight.Position = UDim2.new(0, 18, 0.5, -4)
-indicatorLight.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
-indicatorLight.BorderSizePixel = 0
-indicatorLight.Parent = titleBar
-local lightCorner = Instance.new("UICorner")
-lightCorner.CornerRadius = UDim.new(1, 0)
-lightCorner.Parent = indicatorLight
+local Indicator = Instance.new("Frame")
+Indicator.Size = UDim2.new(0, 6, 0, 6)
+Indicator.Position = UDim2.new(0, 10, 0, 14)
+Indicator.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
+Indicator.BorderSizePixel = 0
+Indicator.Parent = TitleBar
+local IndicatorCorner = Instance.new("UICorner")
+IndicatorCorner.CornerRadius = UDim.new(1, 0)
+IndicatorCorner.Parent = Indicator
 
 task.spawn(function()
     while true do
-        for i = 0.3, 1, 0.1 do indicatorLight.BackgroundTransparency = i task.wait(0.05) end
-        for i = 1, 0.3, -0.1 do indicatorLight.BackgroundTransparency = i task.wait(0.05) end
+        for i = 0.3, 1, 0.1 do Indicator.BackgroundTransparency = i task.wait(0.05) end
+        for i = 1, 0.3, -0.1 do Indicator.BackgroundTransparency = i task.wait(0.05) end
     end
 end)
 
-local titleText = Instance.new("TextLabel")
-titleText.Size = UDim2.new(0.5, 0, 0, 16)
-titleText.Position = UDim2.new(0, 28, 0, 5)
-titleText.BackgroundTransparency = 1
-titleText.Text = "ZAIXPLOIT"
-titleText.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleText.Font = Enum.Font.FredokaOne
-titleText.TextSize = 13
-titleText.TextXAlignment = Enum.TextXAlignment.Left
-titleText.Parent = titleBar
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(0.5, 0, 0, 14)
+Title.Position = UDim2.new(0, 22, 0, 5)
+Title.BackgroundTransparency = 1
+Title.Text = "ZAIXPLOIT"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.Font = Enum.Font.FredokaOne
+Title.TextSize = 10
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Parent = TitleBar
 
-local nickText = Instance.new("TextLabel")
-nickText.Size = UDim2.new(0.5, -50, 0, 16)
-nickText.Position = UDim2.new(0.5, 0, 0, 5)
-nickText.BackgroundTransparency = 1
-nickText.Text = localPlayer.DisplayName
-nickText.TextColor3 = Color3.fromRGB(200, 200, 255)
-nickText.Font = Enum.Font.FredokaOne
-nickText.TextSize = 11
-nickText.TextXAlignment = Enum.TextXAlignment.Right
-nickText.Parent = titleBar
+local NickLabel = Instance.new("TextLabel")
+NickLabel.Size = UDim2.new(0.5, -40, 0, 14)
+NickLabel.Position = UDim2.new(0.5, 0, 0, 5)
+NickLabel.BackgroundTransparency = 1
+NickLabel.Text = LocalPlayer.DisplayName
+NickLabel.TextColor3 = Color3.fromRGB(200, 200, 255)
+NickLabel.Font = Enum.Font.FredokaOne
+NickLabel.TextSize = 9
+NickLabel.TextXAlignment = Enum.TextXAlignment.Right
+NickLabel.Parent = TitleBar
 
-local subTitleText = Instance.new("TextLabel")
-subTitleText.Size = UDim2.new(0.5, 0, 0, 12)
-subTitleText.Position = UDim2.new(0, 28, 0, 23)
-subTitleText.BackgroundTransparency = 1
-subTitleText.Text = "SLIME RNG"
-subTitleText.TextColor3 = Color3.fromRGB(0, 200, 255)
-subTitleText.Font = Enum.Font.FredokaOne
-subTitleText.TextSize = 9
-subTitleText.TextXAlignment = Enum.TextXAlignment.Left
-subTitleText.Parent = titleBar
+local SubTitle = Instance.new("TextLabel")
+SubTitle.Size = UDim2.new(0.5, 0, 0, 10)
+SubTitle.Position = UDim2.new(0, 22, 0, 20)
+SubTitle.BackgroundTransparency = 1
+SubTitle.Text = "SLIME RNG"
+SubTitle.TextColor3 = Color3.fromRGB(0, 150, 255)
+SubTitle.Font = Enum.Font.FredokaOne
+SubTitle.TextSize = 7
+SubTitle.TextXAlignment = Enum.TextXAlignment.Left
+SubTitle.Parent = TitleBar
 
-local userText = Instance.new("TextLabel")
-userText.Size = UDim2.new(0.5, -50, 0, 12)
-userText.Position = UDim2.new(0.5, 0, 0, 23)
-userText.BackgroundTransparency = 1
-userText.Text = localPlayer.Name
-userText.TextColor3 = Color3.fromRGB(150, 150, 200)
-userText.Font = Enum.Font.FredokaOne
-userText.TextSize = 8
-userText.TextXAlignment = Enum.TextXAlignment.Right
-userText.Parent = titleBar
+local UserLabel = Instance.new("TextLabel")
+UserLabel.Size = UDim2.new(0.5, -40, 0, 10)
+UserLabel.Position = UDim2.new(0.5, 0, 0, 20)
+UserLabel.BackgroundTransparency = 1
+UserLabel.Text = LocalPlayer.Name
+UserLabel.TextColor3 = Color3.fromRGB(150, 150, 200)
+UserLabel.Font = Enum.Font.FredokaOne
+UserLabel.TextSize = 7
+UserLabel.TextXAlignment = Enum.TextXAlignment.Right
+UserLabel.Parent = TitleBar
 
-local minBtn = Instance.new("TextButton")
-minBtn.Size = UDim2.new(0, 20, 0, 20)
-minBtn.Position = UDim2.new(1, -28, 0, 17)
-minBtn.BackgroundColor3 = Color3.fromRGB(50, 45, 70)
-minBtn.BackgroundTransparency = 0.3
-minBtn.Text = "−"
-minBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-minBtn.Font = Enum.Font.GothamBold
-minBtn.TextSize = 14
-minBtn.AutoButtonColor = true
-minBtn.Parent = titleBar
-local minCorner = Instance.new("UICorner")
-minCorner.CornerRadius = UDim.new(0, 6)
-minCorner.Parent = minBtn
+local MinBtn = Instance.new("TextButton")
+MinBtn.Size = UDim2.new(0, 18, 0, 18)
+MinBtn.Position = UDim2.new(1, -22, 0, 8)
+MinBtn.BackgroundColor3 = Color3.fromRGB(40, 35, 60)
+MinBtn.BackgroundTransparency = 0.2
+MinBtn.Text = "−"
+MinBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+MinBtn.Font = Enum.Font.GothamBold
+MinBtn.TextSize = 12
+MinBtn.AutoButtonColor = true
+MinBtn.Parent = TitleBar
+local MinCorner = Instance.new("UICorner")
+MinCorner.CornerRadius = UDim.new(0, 4)
+MinCorner.Parent = MinBtn
 
--- ========== SCROLLING FRAME ==========
-local contentScroll = Instance.new("ScrollingFrame")
-contentScroll.Size = UDim2.new(1, 0, 1, -55)
-contentScroll.Position = UDim2.new(0, 0, 0, 55)
-contentScroll.BackgroundTransparency = 1
-contentScroll.ScrollBarThickness = 4
-contentScroll.ScrollBarImageColor3 = Color3.fromRGB(0, 150, 255)
-contentScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-contentScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-contentScroll.Parent = frame
+local Scroll = Instance.new("ScrollingFrame")
+Scroll.Size = UDim2.new(1, 0, 1, -35)
+Scroll.Position = UDim2.new(0, 0, 0, 35)
+Scroll.BackgroundTransparency = 1
+Scroll.ScrollBarThickness = 3
+Scroll.ScrollBarImageColor3 = Color3.fromRGB(0, 150, 255)
+Scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+Scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+Scroll.Parent = Main
 
-local contentLayout = Instance.new("UIListLayout")
-contentLayout.Padding = UDim.new(0, 4)
-contentLayout.SortOrder = Enum.SortOrder.LayoutOrder
-contentLayout.Parent = contentScroll
+local Layout = Instance.new("UIListLayout")
+Layout.Padding = UDim.new(0, 4)
+Layout.SortOrder = Enum.SortOrder.LayoutOrder
+Layout.Parent = Scroll
 
-local padding = Instance.new("UIPadding")
-padding.PaddingLeft = UDim.new(0, 15)
-padding.PaddingRight = UDim.new(0, 15)
-padding.PaddingTop = UDim.new(0, 6)
-padding.PaddingBottom = UDim.new(0, 6)
-padding.Parent = contentScroll
+local Padding = Instance.new("UIPadding")
+Padding.PaddingLeft = UDim.new(0, 8)
+Padding.PaddingRight = UDim.new(0, 8)
+Padding.PaddingTop = UDim.new(0, 6)
+Padding.PaddingBottom = UDim.new(0, 6)
+Padding.Parent = Scroll
 
--- ========== FUNGSI GARIS ==========
-local function addSeparator(parent)
-    local line = Instance.new("Frame")
-    line.Size = UDim2.new(1, 0, 0, 1)
-    line.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
-    line.BackgroundTransparency = 0.6
-    line.BorderSizePixel = 0
-    line.Parent = parent
-    return line
-end
-
--- ========== FUNGSI TOGGLE ==========
-local function createToggle(parent, text, emoji, getState, setState)
-    local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(1, 0, 0, 30)
-    frame.BackgroundColor3 = Color3.fromRGB(22, 20, 38)
-    frame.BackgroundTransparency = 0.2
-    frame.BorderSizePixel = 0
-    frame.Parent = parent
-    local toggleCorner = Instance.new("UICorner")
-    toggleCorner.CornerRadius = UDim.new(0, 6)
-    toggleCorner.Parent = frame
+local function MakeModeToggle(Parent, Text, Emoji, GetMode, SetMode)
+    local Frame = Instance.new("Frame")
+    Frame.Size = UDim2.new(1, 0, 0, 28)
+    Frame.BackgroundColor3 = Color3.fromRGB(18, 16, 32)
+    Frame.BackgroundTransparency = 0.2
+    Frame.BorderSizePixel = 0
+    Frame.Parent = Parent
+    local FCorner = Instance.new("UICorner")
+    FCorner.CornerRadius = UDim.new(0, 5)
+    FCorner.Parent = Frame
     
-    local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(1, -70, 1, 0)
-    label.Position = UDim2.new(0, 10, 0, 0)
-    label.BackgroundTransparency = 1
-    label.Text = emoji .. " " .. text
-    label.TextColor3 = Color3.fromRGB(210, 210, 240)
-    label.Font = Enum.Font.FredokaOne
-    label.TextSize = 10
-    label.TextXAlignment = Enum.TextXAlignment.Left
-    label.Parent = frame
+    local Label = Instance.new("TextLabel")
+    Label.Size = UDim2.new(1, -80, 1, 0)
+    Label.Position = UDim2.new(0, 6, 0, 0)
+    Label.BackgroundTransparency = 1
+    Label.Text = Emoji .. " " .. Text
+    Label.TextColor3 = Color3.fromRGB(200, 200, 230)
+    Label.Font = Enum.Font.FredokaOne
+    Label.TextSize = 9
+    Label.TextXAlignment = Enum.TextXAlignment.Left
+    Label.Parent = Frame
     
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0, 50, 0, 22)
-    btn.Position = UDim2.new(1, -56, 0.5, -11)
-    btn.BackgroundColor3 = getState() and Color3.fromRGB(50, 200, 80) or Color3.fromRGB(45, 40, 65)
-    btn.Text = getState() and "ON" or "OFF"
-    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    btn.Font = Enum.Font.FredokaOne
-    btn.TextSize = 9
-    btn.BorderSizePixel = 0
-    btn.Parent = frame
-    local btnCorner = Instance.new("UICorner")
-    btnCorner.CornerRadius = UDim.new(0, 4)
-    btnCorner.Parent = btn
+    local Btn = Instance.new("TextButton")
+    Btn.Size = UDim2.new(0, 50, 0, 20)
+    Btn.Position = UDim2.new(1, -56, 0.5, -10)
+    Btn.BackgroundColor3 = Color3.fromRGB(50, 150, 255)
+    Btn.Text = "NORMAL"
+    Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Btn.Font = Enum.Font.FredokaOne
+    Btn.TextSize = 8
+    Btn.BorderSizePixel = 0
+    Btn.Parent = Frame
+    local BtnCorner = Instance.new("UICorner")
+    BtnCorner.CornerRadius = UDim.new(0, 4)
+    BtnCorner.Parent = Btn
     
-    btn.MouseButton1Click:Connect(function()
-        local newState = not getState()
-        setState(newState)
-        if newState then
-            btn.BackgroundColor3 = Color3.fromRGB(50, 200, 80)
-            btn.Text = "ON"
-        else
-            btn.BackgroundColor3 = Color3.fromRGB(45, 40, 65)
-            btn.Text = "OFF"
+    local function UpdateButton()
+        local Mode = GetMode()
+        if Mode == 0 then
+            Btn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+            Btn.Text = "OFF"
+        elseif Mode == 1 then
+            Btn.BackgroundColor3 = Color3.fromRGB(50, 150, 255)
+            Btn.Text = "NORMAL"
+        elseif Mode == 2 then
+            Btn.BackgroundColor3 = Color3.fromRGB(0, 80, 200)
+            Btn.Text = "FAST"
         end
+    end
+    
+    Btn.MouseButton1Click:Connect(function()
+        local Mode = GetMode()
+        if Mode == 0 then
+            SetMode(1)
+        elseif Mode == 1 then
+            SetMode(2)
+        elseif Mode == 2 then
+            SetMode(0)
+        end
+        UpdateButton()
     end)
     
-    return frame
+    UpdateButton()
+    return Frame
 end
 
--- ========== MEMBUAT UI ==========
-createToggle(contentScroll, "Auto Gun", "🔫", function() return autoGunActive end, function(v) autoGunActive = v end)
-addSeparator(contentScroll)
+local function MakeToggle(Parent, Text, Emoji, GetState, SetState)
+    local Frame = Instance.new("Frame")
+    Frame.Size = UDim2.new(1, 0, 0, 24)
+    Frame.BackgroundColor3 = Color3.fromRGB(18, 16, 32)
+    Frame.BackgroundTransparency = 0.2
+    Frame.BorderSizePixel = 0
+    Frame.Parent = Parent
+    local FCorner = Instance.new("UICorner")
+    FCorner.CornerRadius = UDim.new(0, 5)
+    FCorner.Parent = Frame
+    
+    local Label = Instance.new("TextLabel")
+    Label.Size = UDim2.new(1, -55, 1, 0)
+    Label.Position = UDim2.new(0, 6, 0, 0)
+    Label.BackgroundTransparency = 1
+    Label.Text = Emoji .. " " .. Text
+    Label.TextColor3 = Color3.fromRGB(200, 200, 230)
+    Label.Font = Enum.Font.FredokaOne
+    Label.TextSize = 9
+    Label.TextXAlignment = Enum.TextXAlignment.Left
+    Label.Parent = Frame
+    
+    local Btn = Instance.new("TextButton")
+    Btn.Size = UDim2.new(0, 40, 0, 18)
+    Btn.Position = UDim2.new(1, -46, 0.5, -9)
+    Btn.BackgroundColor3 = GetState() and Color3.fromRGB(50, 150, 255) or Color3.fromRGB(70, 70, 70)
+    Btn.Text = GetState() and "ON" or "OFF"
+    Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Btn.Font = Enum.Font.FredokaOne
+    Btn.TextSize = 8
+    Btn.BorderSizePixel = 0
+    Btn.Parent = Frame
+    local BtnCorner = Instance.new("UICorner")
+    BtnCorner.CornerRadius = UDim.new(0, 4)
+    BtnCorner.Parent = Btn
+    
+    Btn.MouseButton1Click:Connect(function()
+        local New = not GetState()
+        SetState(New)
+        Btn.BackgroundColor3 = New and Color3.fromRGB(50, 150, 255) or Color3.fromRGB(70, 70, 70)
+        Btn.Text = New and "ON" or "OFF"
+    end)
+    
+    return Frame
+end
 
-createToggle(contentScroll, "Auto Roll", "🎲", function() return autoRollActive end, function(v) autoRollActive = v end)
-addSeparator(contentScroll)
+local function MakeTitle(Parent, Text)
+    local Label = Instance.new("TextLabel")
+    Label.Size = UDim2.new(1, 0, 0, 18)
+    Label.BackgroundTransparency = 1
+    Label.Text = Text
+    Label.TextColor3 = Color3.fromRGB(0, 150, 255)
+    Label.Font = Enum.Font.FredokaOne
+    Label.TextSize = 9
+    Label.TextXAlignment = Enum.TextXAlignment.Left
+    Label.Parent = Parent
+    return Label
+end
 
-local utilTitle = Instance.new("TextLabel")
-utilTitle.Size = UDim2.new(1, 0, 0, 22)
-utilTitle.BackgroundTransparency = 1
-utilTitle.Text = "📦 AUTO UTILITY"
-utilTitle.TextColor3 = Color3.fromRGB(0, 200, 255)
-utilTitle.Font = Enum.Font.FredokaOne
-utilTitle.TextSize = 10
-utilTitle.TextXAlignment = Enum.TextXAlignment.Left
-utilTitle.Parent = contentScroll
+local function MakeSep(Parent)
+    local Line = Instance.new("Frame")
+    Line.Size = UDim2.new(1, 0, 0, 1)
+    Line.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
+    Line.BackgroundTransparency = 0.6
+    Line.BorderSizePixel = 0
+    Line.Parent = Parent
+    return Line
+end
 
-createToggle(contentScroll, "Auto Index", "📊", function() return autoIndexActive end, function(v) autoIndexActive = v end)
-createToggle(contentScroll, "Auto Farm Loot", "💰", function() return autoFarmLootActive end, function(v) autoFarmLootActive = v end)
-createToggle(contentScroll, "Auto Farm Fruit", "🍎", function() return autoFarmFruitActive end, function(v) autoFarmFruitActive = v end)
-createToggle(contentScroll, "Auto Rebirth", "🔄", function() return autoRebirthActive end, function(v) autoRebirthActive = v end)
-createToggle(contentScroll, "Auto Buy Zone", "🏪", function() return autoBuyZoneActive end, function(v) autoBuyZoneActive = v end)
-createToggle(contentScroll, "Auto Best Zone", "📍", function() return autoBestZoneActive end, function(v) autoBestZoneActive = v end)
-addSeparator(contentScroll)
-
-local potTitle = Instance.new("TextLabel")
-potTitle.Size = UDim2.new(1, 0, 0, 22)
-potTitle.BackgroundTransparency = 1
-potTitle.Text = "🧪 AUTO POTION"
-potTitle.TextColor3 = Color3.fromRGB(0, 200, 255)
-potTitle.Font = Enum.Font.FredokaOne
-potTitle.TextSize = 10
-potTitle.TextXAlignment = Enum.TextXAlignment.Left
-potTitle.Parent = contentScroll
-
-createToggle(contentScroll, "Luck Potion", "🍀", function() return autoLuckActive end, function(v) autoLuckActive = v end)
-createToggle(contentScroll, "Ultra Luck Potion", "⭐", function() return autoUltraLuckActive end, function(v) autoUltraLuckActive = v end)
-createToggle(contentScroll, "Currency Potion", "💵", function() return autoCurrencyActive end, function(v) autoCurrencyActive = v end)
-createToggle(contentScroll, "Roll Speed Potion", "⚡", function() return autoRollSpeedActive end, function(v) autoRollSpeedActive = v end)
-addSeparator(contentScroll)
-
-local zoneStatus = Instance.new("TextLabel")
-zoneStatus.Size = UDim2.new(1, 0, 0, 16)
-zoneStatus.BackgroundTransparency = 1
-zoneStatus.Text = "📍 Best Zone: --"
-zoneStatus.TextColor3 = Color3.fromRGB(150, 150, 200)
-zoneStatus.Font = Enum.Font.FredokaOne
-zoneStatus.TextSize = 8
-zoneStatus.TextXAlignment = Enum.TextXAlignment.Left
-zoneStatus.Parent = contentScroll
-
-task.spawn(function()
-    while true do
-        local bestZone = getBestOpenZone()
-        if bestZone > 0 then
-            zoneStatus.Text = "📍 Best Zone: " .. bestZone
-            if autoBestZoneActive then
-                zoneStatus.TextColor3 = Color3.fromRGB(100, 255, 100)
-            else
-                zoneStatus.TextColor3 = Color3.fromRGB(150, 150, 200)
-            end
-        else
-            zoneStatus.Text = "📍 Best Zone: --"
-        end
-        task.wait(1)
+MakeModeToggle(Scroll, "Auto Gun", "🔫", function() return AutoGunMode end, function(v)
+    AutoGunMode = v
+    if v == 1 then GunDelay = 0.1
+    elseif v == 2 then GunDelay = 0.01
     end
 end)
 
--- ========== MINIMIZE ==========
-minBtn.MouseButton1Click:Connect(function()
+MakeModeToggle(Scroll, "Auto Roll", "🎲", function() return AutoRollMode end, function(v)
+    AutoRollMode = v
+    if v == 1 then RollDelay = 0.1
+    elseif v == 2 then RollDelay = 0.01
+    end
+end)
+
+MakeSep(Scroll)
+MakeTitle(Scroll, "📦 AUTO UTILITY")
+MakeToggle(Scroll, "Auto Index", "📊", function() return AutoIndex end, function(v) AutoIndex = v end)
+MakeToggle(Scroll, "Auto Farm Loot", "💰", function() return AutoFarmLoot end, function(v) AutoFarmLoot = v end)
+MakeToggle(Scroll, "Auto Upgrade", "⬆️", function() return AutoUpgrade end, function(v) AutoUpgrade = v end)
+MakeToggle(Scroll, "Auto Rebirth", "🔄", function() return AutoRebirth end, function(v) AutoRebirth = v end)
+MakeToggle(Scroll, "Auto Buy Zone", "🏪", function() return AutoBuyZone end, function(v) AutoBuyZone = v end)
+MakeSep(Scroll)
+
+MakeTitle(Scroll, "🧪 AUTO POTION")
+MakeToggle(Scroll, "Luck Potion", "🍀", function() return AutoLuck end, function(v) AutoLuck = v end)
+MakeToggle(Scroll, "Ultra Luck Potion", "⭐", function() return AutoUltraLuck end, function(v) AutoUltraLuck = v end)
+MakeToggle(Scroll, "Currency Potion", "💵", function() return AutoCurrency end, function(v) AutoCurrency = v end)
+MakeToggle(Scroll, "Roll Speed Potion", "⚡", function() return AutoRollSpeed end, function(v) AutoRollSpeed = v end)
+
+local Status = Instance.new("TextLabel")
+Status.Size = UDim2.new(1, -20, 0, 14)
+Status.BackgroundTransparency = 1
+Status.Text = "● ANTI AFK ACTIVE"
+Status.TextColor3 = Color3.fromRGB(100, 255, 100)
+Status.Font = Enum.Font.FredokaOne
+Status.TextSize = 8
+Status.TextXAlignment = Enum.TextXAlignment.Left
+Status.Parent = Scroll
+
+MinBtn.MouseButton1Click:Connect(function()
     isMinimized = not isMinimized
     if isMinimized then
-        frame.Size = UDim2.new(0, 280, 0, 55)
-        contentScroll.Visible = false
-        sideLamp.Visible = false
-        minBtn.Text = "+"
+        Main.Size = UDim2.new(0, 210, 0, 35)
+        Scroll.Visible = false
+        SideLamp.Visible = false
+        MinBtn.Text = "+"
     else
-        frame.Size = UDim2.new(0, 280, 0, 440)
-        contentScroll.Visible = true
-        sideLamp.Visible = true
-        minBtn.Text = "−"
+        Main.Size = UDim2.new(0, 210, 0, 320)
+        Scroll.Visible = true
+        SideLamp.Visible = true
+        MinBtn.Text = "−"
     end
 end)
 
 print("═══════════════════════════════════════════")
 print("   ZAIXPLOIT | SLIME RNG - FINAL")
 print("═══════════════════════════════════════════")
-print("✅ AUTO GUN (0.033s) | AUTO ROLL (0.033s)")
-print("✅ AUTO INDEX (5s) | AUTO UPGRADE (1s)")
-print("✅ AUTO POTION (1s) | AUTO FARM (0.5s)")
-print("✅ AUTO BUY ZONE | AUTO BEST ZONE (PISAH)")
-print("✅ BEST ZONE DETEKSI MULTI METHOD")
-print("✅ BACKGROUND GELAP (0.25)")
-print("✅ SIDE LAMP 100 STRIP × 3px")
-print("✅ ANTI AFK + DELETE AUTOREJOIN")
+print("✅ AUTO GUN | AUTO ROLL (OFF/NORMAL/FAST)")
+print("✅ AUTO INDEX | AUTO FARM LOOT")
+print("✅ AUTO UPGRADE | AUTO REBIRTH")
+print("✅ AUTO BUY ZONE + TELEPORT (DepthFade)")
+print("✅ AUTO POTION (4 BOOSTS)")
 print("🚀 SCRIPT SIAP DIGUNAKAN")
 print("═══════════════════════════════════════════")
