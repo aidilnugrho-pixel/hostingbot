@@ -16,6 +16,7 @@ local autoFarmFruitActive = false
 local autoUpgradeActive = false
 local autoRebirthActive = false
 local autoBuyZoneActive = false
+local autoBestZoneActive = false
 local autoLuckActive = false
 local autoUltraLuckActive = false
 local autoCurrencyActive = false
@@ -39,6 +40,120 @@ local rebirthRemote = getRemote("RebirthService")
 local zonesRemote = getRemote("ZonesService")
 local upgradeRemote = getRemote("UpgradeService")
 local lootRemote = getRemote("LootService")
+
+-- ========== ZONE FUNCTIONS ==========
+local function buyZone()
+    if not zonesRemote then return false end
+    local success = pcall(function()
+        zonesRemote:InvokeServer("requestPurchaseZone")
+    end)
+    return success
+end
+
+local function teleportToZone(zoneNumber)
+    if not zonesRemote or not zoneNumber or zoneNumber <= 0 then return false end
+    local success = pcall(function()
+        zonesRemote:InvokeServer("requestTeleportZone", zoneNumber)
+    end)
+    return success
+end
+
+-- Cek apakah zona terbuka (MULTI METHOD)
+local function isZoneOpen(zone)
+    local zoneNum = tonumber(zone.Name)
+    if not zoneNum then return false end
+    
+    -- METHOD 1: Cek POI.Hitbox
+    local poi = zone:FindFirstChild("POI")
+    if poi then
+        local hitbox = poi:FindFirstChild("Hitbox")
+        if hitbox and hitbox:IsA("BasePart") then
+            return true
+        end
+    end
+    
+    -- METHOD 2: Cek Gate ClientGateBlocker
+    local gate = zone:FindFirstChild("Gate")
+    if gate then
+        local blocker = gate:FindFirstChild("ClientGateBlocker_" .. zoneNum)
+        if blocker and not blocker.CanCollide then
+            return true
+        end
+        
+        -- METHOD 3: Cek DepthFade
+        local depthFade = gate:FindFirstChild("DepthFade")
+        if depthFade and depthFade.Enabled == false then
+            return true
+        end
+    end
+    
+    -- METHOD 4: Cek part dengan CanCollide false
+    for _, child in ipairs(zone:GetDescendants()) do
+        if child:IsA("BasePart") and child.CanCollide == false then
+            return true
+        end
+    end
+    
+    return false
+end
+
+-- Ambil best zone (zona tertinggi yang terbuka)
+local function getBestOpenZone()
+    local bestZone = 0
+    local zonesFolder = workspace:FindFirstChild("Zones")
+    
+    if not zonesFolder then
+        return 0
+    end
+    
+    for _, zone in ipairs(zonesFolder:GetChildren()) do
+        local zoneNum = tonumber(zone.Name)
+        if zoneNum and zoneNum > 0 and isZoneOpen(zone) then
+            if zoneNum > bestZone then
+                bestZone = zoneNum
+            end
+        end
+    end
+    
+    return bestZone
+end
+
+-- Ambil posisi player saat ini di zona berapa
+local function getCurrentPlayerZone()
+    local character = localPlayer.Character
+    if not character then return 0 end
+    
+    local hrp = character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return 0 end
+    
+    local playerPos = hrp.Position
+    local zonesFolder = workspace:FindFirstChild("Zones")
+    
+    if not zonesFolder then return 0 end
+    
+    for _, zone in ipairs(zonesFolder:GetChildren()) do
+        local zoneNum = tonumber(zone.Name)
+        if zoneNum and zoneNum > 0 then
+            local poi = zone:FindFirstChild("POI")
+            if poi then
+                local hitbox = poi:FindFirstChild("Hitbox")
+                if hitbox and hitbox:IsA("BasePart") then
+                    local hitboxPos = hitbox.Position
+                    local hitboxSize = hitbox.Size
+                    local halfX = hitboxSize.X / 2
+                    local halfZ = hitboxSize.Z / 2
+                    
+                    if math.abs(playerPos.X - hitboxPos.X) <= halfX and
+                       math.abs(playerPos.Z - hitboxPos.Z) <= halfZ then
+                        return zoneNum
+                    end
+                end
+            end
+        end
+    end
+    
+    return 0
+end
 
 -- ========== AUTO GUN ==========
 local function attackSlime(slimeId)
@@ -241,174 +356,40 @@ task.spawn(function()
     end
 end)
 
--- ========== AUTO BUY + BEST ZONE (SISTEM FIX) ==========
-
--- Ambil zona tertinggi yang punya Hitbox (terbuka)
-local function getBestOpenZone()
-    local bestZone = 0
-    local zonesFolder = workspace:FindFirstChild("Zones")
-    
-    if not zonesFolder then
-        return 0
-    end
-    
-    for _, zone in ipairs(zonesFolder:GetChildren()) do
-        local zoneNum = tonumber(zone.Name)
-        if zoneNum and zoneNum > 0 then
-            local poi = zone:FindFirstChild("POI")
-            if poi then
-                local hitbox = poi:FindFirstChild("Hitbox")
-                if hitbox and hitbox:IsA("BasePart") then
-                    if zoneNum > bestZone then
-                        bestZone = zoneNum
-                    end
-                end
-            end
-        end
-    end
-    
-    return bestZone
-end
-
--- Cek player sedang di zona berapa (berdasarkan posisi di Hitbox)
-local function getCurrentPlayerZone()
-    local character = localPlayer.Character
-    if not character then return 0 end
-    
-    local hrp = character:FindFirstChild("HumanoidRootPart")
-    if not hrp then return 0 end
-    
-    local playerPos = hrp.Position
-    local zonesFolder = workspace:FindFirstChild("Zones")
-    
-    if not zonesFolder then return 0 end
-    
-    local currentZone = 0
-    
-    for _, zone in ipairs(zonesFolder:GetChildren()) do
-        local zoneNum = tonumber(zone.Name)
-        if zoneNum and zoneNum > 0 then
-            local poi = zone:FindFirstChild("POI")
-            if poi then
-                local hitbox = poi:FindFirstChild("Hitbox")
-                if hitbox and hitbox:IsA("BasePart") then
-                    -- Cek apakah player berada di dalam hitbox
-                    local hitboxPos = hitbox.Position
-                    local hitboxSize = hitbox.Size
-                    local halfX = hitboxSize.X / 2
-                    local halfZ = hitboxSize.Z / 2
-                    
-                    if math.abs(playerPos.X - hitboxPos.X) <= halfX and
-                       math.abs(playerPos.Z - hitboxPos.Z) <= halfZ then
-                        if zoneNum > currentZone then
-                            currentZone = zoneNum
-                        end
-                    end
-                end
-            end
-        end
-    end
-    
-    return currentZone
-end
-
--- Cek apakah bisa beli zona berikutnya
-local function canBuyNextZone()
-    local currentZone = getBestOpenZone()
-    local zonesFolder = workspace:FindFirstChild("Zones")
-    if not zonesFolder then return false end
-    local nextZone = zonesFolder:FindFirstChild(tostring(currentZone + 1))
-    return nextZone ~= nil
-end
-
--- Beli zona (pakai remote)
-local function tryBuyZone()
-    if not zonesRemote then return false end
-    if maxZoneReached then return false end
-    
-    if not canBuyNextZone() then
-        maxZoneReached = true
-        autoBuyZoneActive = false
-        print("✅ [AUTO BUY] Max zone reached! Stopping...")
-        return false
-    end
-    
-    local success = pcall(function()
-        zonesRemote:InvokeServer("requestPurchaseZone")
-    end)
-    
-    if not success then
-        maxZoneReached = true
-        autoBuyZoneActive = false
-        print("✅ [AUTO BUY] Purchase failed! Stopping...")
-        return false
-    end
-    
-    print("✅ [AUTO BUY] Zone purchased!")
-    return true
-end
-
--- Teleport ke zona terbaik (jika belum di zona tersebut)
-local function tryTeleportToBestZone()
-    if not zonesRemote then return false end
-    
-    local bestZone = getBestOpenZone()
-    local currentZone = getCurrentPlayerZone()
-    
-    print("📍 Current zone:", currentZone, "| Best zone:", bestZone)
-    
-    -- Jika sudah di zona terbaik, tidak usah teleport
-    if currentZone >= bestZone then
-        print("✅ [AUTO ZONE] Already at best zone:", currentZone)
-        return true
-    end
-    
-    if bestZone == 0 then
-        autoBuyZoneActive = false
-        print("❌ [AUTO ZONE] No open zone found! Stopping...")
-        return false
-    end
-    
-    print("🚀 [AUTO ZONE] Teleporting from", currentZone, "to", bestZone)
-    
-    pcall(function()
-        zonesRemote:InvokeServer("requestTeleportZone", bestZone)
-    end)
-    
-    return true
-end
-
--- LOOP UTAMA AUTO BUY + TELEPORT
+-- ========== AUTO BUY ZONE ==========
 task.spawn(function()
     while true do
-        if autoBuyZoneActive then
-            -- Cek apakah perlu beli
-            local currentBest = getBestOpenZone()
-            local canBuy = canBuyNextZone()
-            
-            if canBuy then
-                -- Beli zona berikutnya
-                local bought = tryBuyZone()
-                if bought then
-                    task.wait(1)
+        if autoBuyZoneActive and not maxZoneReached then
+            local bestZone = getBestOpenZone()
+            local zonesFolder = workspace:FindFirstChild("Zones")
+            if zonesFolder and zonesFolder:FindFirstChild(tostring(bestZone + 1)) then
+                local success = buyZone()
+                if not success then
+                    maxZoneReached = true
+                    autoBuyZoneActive = false
                 end
+                task.wait(1)
+            else
+                maxZoneReached = true
+                autoBuyZoneActive = false
             end
-            
-            -- Teleport ke zona terbaik (jika belum di sana)
-            tryTeleportToBestZone()
         end
-        task.wait(3)
+        task.wait(5)
     end
 end)
 
--- Reset flag setiap 2 menit
+-- ========== AUTO BEST ZONE ==========
 task.spawn(function()
     while true do
-        task.wait(120)
-        if maxZoneReached and canBuyNextZone() then
-            maxZoneReached = false
-            print("✅ [AUTO BUY] New zone detected! Auto Buy re-enabled.")
+        if autoBestZoneActive then
+            local bestZone = getBestOpenZone()
+            local currentZone = getCurrentPlayerZone()
+            
+            if bestZone > 0 and currentZone < bestZone then
+                teleportToZone(bestZone)
+            end
         end
+        task.wait(3)
     end
 end)
 
@@ -460,8 +441,8 @@ screenGui.ResetOnSpawn = false
 screenGui.Parent = localPlayer:WaitForChild("PlayerGui")
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 280, 0, 420)
-frame.Position = UDim2.new(0.5, -140, 0.5, -210)
+frame.Size = UDim2.new(0, 280, 0, 440)
+frame.Position = UDim2.new(0.5, -140, 0.5, -220)
 frame.BackgroundColor3 = Color3.fromRGB(8, 8, 18)
 frame.BackgroundTransparency = 0.25
 frame.BorderSizePixel = 0
@@ -722,7 +703,8 @@ createToggle(contentScroll, "Auto Index", "📊", function() return autoIndexAct
 createToggle(contentScroll, "Auto Farm Loot", "💰", function() return autoFarmLootActive end, function(v) autoFarmLootActive = v end)
 createToggle(contentScroll, "Auto Farm Fruit", "🍎", function() return autoFarmFruitActive end, function(v) autoFarmFruitActive = v end)
 createToggle(contentScroll, "Auto Rebirth", "🔄", function() return autoRebirthActive end, function(v) autoRebirthActive = v end)
-createToggle(contentScroll, "Auto Buy + Best Zone", "🏪", function() return autoBuyZoneActive end, function(v) autoBuyZoneActive = v end)
+createToggle(contentScroll, "Auto Buy Zone", "🏪", function() return autoBuyZoneActive end, function(v) autoBuyZoneActive = v end)
+createToggle(contentScroll, "Auto Best Zone", "📍", function() return autoBestZoneActive end, function(v) autoBestZoneActive = v end)
 addSeparator(contentScroll)
 
 local potTitle = Instance.new("TextLabel")
@@ -744,7 +726,7 @@ addSeparator(contentScroll)
 local zoneStatus = Instance.new("TextLabel")
 zoneStatus.Size = UDim2.new(1, 0, 0, 16)
 zoneStatus.BackgroundTransparency = 1
-zoneStatus.Text = "🏪 Zone: Ready"
+zoneStatus.Text = "📍 Best Zone: --"
 zoneStatus.TextColor3 = Color3.fromRGB(150, 150, 200)
 zoneStatus.Font = Enum.Font.FredokaOne
 zoneStatus.TextSize = 8
@@ -753,17 +735,16 @@ zoneStatus.Parent = contentScroll
 
 task.spawn(function()
     while true do
-        if autoBuyZoneActive then
-            if maxZoneReached then
-                zoneStatus.Text = "🏪 Zone: MAX REACHED (stopped)"
-                zoneStatus.TextColor3 = Color3.fromRGB(255, 100, 100)
-            else
-                zoneStatus.Text = "🏪 Zone: Active"
+        local bestZone = getBestOpenZone()
+        if bestZone > 0 then
+            zoneStatus.Text = "📍 Best Zone: " .. bestZone
+            if autoBestZoneActive then
                 zoneStatus.TextColor3 = Color3.fromRGB(100, 255, 100)
+            else
+                zoneStatus.TextColor3 = Color3.fromRGB(150, 150, 200)
             end
         else
-            zoneStatus.Text = "🏪 Zone: Disabled"
-            zoneStatus.TextColor3 = Color3.fromRGB(150, 150, 200)
+            zoneStatus.Text = "📍 Best Zone: --"
         end
         task.wait(1)
     end
@@ -778,7 +759,7 @@ minBtn.MouseButton1Click:Connect(function()
         sideLamp.Visible = false
         minBtn.Text = "+"
     else
-        frame.Size = UDim2.new(0, 280, 0, 420)
+        frame.Size = UDim2.new(0, 280, 0, 440)
         contentScroll.Visible = true
         sideLamp.Visible = true
         minBtn.Text = "−"
@@ -791,9 +772,8 @@ print("════════════════════════�
 print("✅ AUTO GUN (0.033s) | AUTO ROLL (0.033s)")
 print("✅ AUTO INDEX (5s) | AUTO UPGRADE (1s)")
 print("✅ AUTO POTION (1s) | AUTO FARM (0.5s)")
-print("✅ AUTO BUY ZONE + BEST ZONE (FIX)")
-print("✅ DETEKSI ZONA BERDASARKAN HITBOX")
-print("✅ TELEPORT HANYA JIKA BELUM DI ZONA TERBAIK")
+print("✅ AUTO BUY ZONE | AUTO BEST ZONE (PISAH)")
+print("✅ BEST ZONE DETEKSI MULTI METHOD")
 print("✅ BACKGROUND GELAP (0.25)")
 print("✅ SIDE LAMP 100 STRIP × 3px")
 print("✅ ANTI AFK + DELETE AUTOREJOIN")
