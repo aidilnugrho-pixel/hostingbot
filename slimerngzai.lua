@@ -400,7 +400,7 @@ screenGui.ResetOnSpawn = false
 screenGui.Parent = localPlayer:WaitForChild("PlayerGui")
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 280, 0, 400)
+frame.Size = UDim2.new(0, 280, 0, 380)
 frame.Position = UDim2.new(0.5, -140, 0.5, -200)
 frame.BackgroundColor3 = Color3.fromRGB(10, 10, 20)
 frame.BackgroundTransparency = 0.35
