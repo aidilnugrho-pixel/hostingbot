@@ -363,10 +363,10 @@ screenGui.ResetOnSpawn = false
 screenGui.Parent = localPlayer:WaitForChild("PlayerGui")
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 280, 0, 460)
-frame.Position = UDim2.new(0.5, -140, 0.5, -230)
+frame.Size = UDim2.new(0, 280, 0, 400)
+frame.Position = UDim2.new(0.5, -140, 0.5, -200)
 frame.BackgroundColor3 = Color3.fromRGB(10, 10, 20)
-frame.BackgroundTransparency = 0.3  -- ← TRANSPARAN 0.3
+frame.BackgroundTransparency = 0.3
 frame.BorderSizePixel = 0
 frame.Active = true
 frame.Draggable = true
@@ -382,30 +382,35 @@ stroke.Transparency = 0.4
 stroke.Thickness = 1
 stroke.Parent = frame
 
--- ========== SIDE LAMP (DI DALAM FRAME, PASTI KELIHATAN) ==========
+-- ========== SIDE LAMP GRADIENT BAGUS (100 STRIP, 2px) ==========
 local sideLamp = Instance.new("Frame")
-sideLamp.Size = UDim2.new(0, 5, 1, -10)
-sideLamp.Position = UDim2.new(0, 3, 0, 5)  -- ← di DALAM frame
+sideLamp.Size = UDim2.new(0, 6, 1, -10)  -- lebih lebar 6px
+sideLamp.Position = UDim2.new(0, 3, 0, 5)
 sideLamp.BackgroundTransparency = 1
 sideLamp.BorderSizePixel = 0
-sideLamp.ZIndex = 10  -- ← biar di atas
+sideLamp.ZIndex = 10
 sideLamp.Parent = frame
 
+-- Warna gradient lebih banyak (12 warna)
 local colorGradient = {
-    Color3.fromRGB(0, 80, 255),
-    Color3.fromRGB(0, 130, 255),
-    Color3.fromRGB(0, 180, 255),
-    Color3.fromRGB(100, 200, 255),
-    Color3.fromRGB(255, 220, 0),
-    Color3.fromRGB(255, 180, 0),
-    Color3.fromRGB(40, 40, 55),
-    Color3.fromRGB(20, 20, 35),
+    Color3.fromRGB(0, 50, 200),
+    Color3.fromRGB(0, 80, 230),
+    Color3.fromRGB(0, 120, 250),
+    Color3.fromRGB(0, 160, 255),
+    Color3.fromRGB(50, 200, 255),
+    Color3.fromRGB(150, 220, 255),
+    Color3.fromRGB(255, 230, 100),
+    Color3.fromRGB(255, 200, 50),
+    Color3.fromRGB(255, 160, 0),
+    Color3.fromRGB(60, 50, 70),
+    Color3.fromRGB(30, 25, 45),
+    Color3.fromRGB(15, 15, 30),
 }
 
 local strips = {}
-for i = 1, 70 do
+for i = 1, 100 do  -- 100 strip
     local strip = Instance.new("Frame")
-    strip.Size = UDim2.new(1, 0, 0, 3)
+    strip.Size = UDim2.new(1, 0, 0, 2)  -- tinggi 2px
     strip.BackgroundColor3 = colorGradient[(i % #colorGradient) + 1]
     strip.BorderSizePixel = 0
     strip.ZIndex = 10
@@ -426,13 +431,13 @@ task.spawn(function()
             strip.BackgroundColor3 = colorGradient[colorIndex]
         end
         offset = offset + 1
-        task.wait(0.08)
+        task.wait(0.06)  -- lebih cepat biar smooth
     end
 end)
 
 -- ========== TITLE BAR ==========
 local titleBar = Instance.new("Frame")
-titleBar.Size = UDim2.new(1, 0, 0, 60)
+titleBar.Size = UDim2.new(1, 0, 0, 55)
 titleBar.BackgroundColor3 = Color3.fromRGB(20, 18, 35)
 titleBar.BackgroundTransparency = 0.2
 titleBar.BorderSizePixel = 0
@@ -444,7 +449,7 @@ titleCorner.Parent = titleBar
 
 local indicatorLight = Instance.new("Frame")
 indicatorLight.Size = UDim2.new(0, 8, 0, 8)
-indicatorLight.Position = UDim2.new(0, 20, 0.5, -4)
+indicatorLight.Position = UDim2.new(0, 18, 0.5, -4)
 indicatorLight.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
 indicatorLight.BorderSizePixel = 0
 indicatorLight.Parent = titleBar
@@ -461,62 +466,62 @@ end)
 
 -- Baris 1 Kiri
 local titleText = Instance.new("TextLabel")
-titleText.Size = UDim2.new(0.5, 0, 0, 18)
-titleText.Position = UDim2.new(0, 28, 0, 6)
+titleText.Size = UDim2.new(0.5, 0, 0, 16)
+titleText.Position = UDim2.new(0, 28, 0, 5)
 titleText.BackgroundTransparency = 1
 titleText.Text = "ZAIXPLOIT"
 titleText.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleText.Font = Enum.Font.FredokaOne
-titleText.TextSize = 14
+titleText.TextSize = 13
 titleText.TextXAlignment = Enum.TextXAlignment.Left
 titleText.Parent = titleBar
 
 -- Baris 1 Kanan
 local nickText = Instance.new("TextLabel")
-nickText.Size = UDim2.new(0.5, -50, 0, 18)
-nickText.Position = UDim2.new(0.5, 0, 0, 6)
+nickText.Size = UDim2.new(0.5, -50, 0, 16)
+nickText.Position = UDim2.new(0.5, 0, 0, 5)
 nickText.BackgroundTransparency = 1
 nickText.Text = localPlayer.DisplayName
 nickText.TextColor3 = Color3.fromRGB(200, 200, 255)
 nickText.Font = Enum.Font.FredokaOne
-nickText.TextSize = 12
+nickText.TextSize = 11
 nickText.TextXAlignment = Enum.TextXAlignment.Right
 nickText.Parent = titleBar
 
 -- Baris 2 Kiri
 local subTitleText = Instance.new("TextLabel")
 subTitleText.Size = UDim2.new(0.5, 0, 0, 12)
-subTitleText.Position = UDim2.new(0, 28, 0, 26)
+subTitleText.Position = UDim2.new(0, 28, 0, 23)
 subTitleText.BackgroundTransparency = 1
 subTitleText.Text = "SLIME RNG"
 subTitleText.TextColor3 = Color3.fromRGB(0, 200, 255)
 subTitleText.Font = Enum.Font.FredokaOne
-subTitleText.TextSize = 10
+subTitleText.TextSize = 9
 subTitleText.TextXAlignment = Enum.TextXAlignment.Left
 subTitleText.Parent = titleBar
 
 -- Baris 2 Kanan
 local userText = Instance.new("TextLabel")
 userText.Size = UDim2.new(0.5, -50, 0, 12)
-userText.Position = UDim2.new(0.5, 0, 0, 26)
+userText.Position = UDim2.new(0.5, 0, 0, 23)
 userText.BackgroundTransparency = 1
 userText.Text = localPlayer.Name
 userText.TextColor3 = Color3.fromRGB(150, 150, 200)
 userText.Font = Enum.Font.FredokaOne
-userText.TextSize = 9
+userText.TextSize = 8
 userText.TextXAlignment = Enum.TextXAlignment.Right
 userText.Parent = titleBar
 
 -- MINIMIZE BUTTON
 local minBtn = Instance.new("TextButton")
-minBtn.Size = UDim2.new(0, 22, 0, 22)
-minBtn.Position = UDim2.new(1, -30, 0, 19)
+minBtn.Size = UDim2.new(0, 20, 0, 20)
+minBtn.Position = UDim2.new(1, -28, 0, 17)
 minBtn.BackgroundColor3 = Color3.fromRGB(50, 45, 70)
 minBtn.BackgroundTransparency = 0.3
 minBtn.Text = "−"
 minBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 minBtn.Font = Enum.Font.GothamBold
-minBtn.TextSize = 16
+minBtn.TextSize = 14
 minBtn.AutoButtonColor = true
 minBtn.Parent = titleBar
 local minCorner = Instance.new("UICorner")
@@ -525,8 +530,8 @@ minCorner.Parent = minBtn
 
 -- ========== SCROLLING FRAME ==========
 local contentScroll = Instance.new("ScrollingFrame")
-contentScroll.Size = UDim2.new(1, 0, 1, -60)
-contentScroll.Position = UDim2.new(0, 0, 0, 60)
+contentScroll.Size = UDim2.new(1, 0, 1, -55)
+contentScroll.Position = UDim2.new(0, 0, 0, 55)
 contentScroll.BackgroundTransparency = 1
 contentScroll.ScrollBarThickness = 4
 contentScroll.ScrollBarImageColor3 = Color3.fromRGB(0, 150, 255)
@@ -535,15 +540,15 @@ contentScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
 contentScroll.Parent = frame
 
 local contentLayout = Instance.new("UIListLayout")
-contentLayout.Padding = UDim.new(0, 6)
+contentLayout.Padding = UDim.new(0, 4)
 contentLayout.SortOrder = Enum.SortOrder.LayoutOrder
 contentLayout.Parent = contentScroll
 
 local padding = Instance.new("UIPadding")
 padding.PaddingLeft = UDim.new(0, 15)
 padding.PaddingRight = UDim.new(0, 15)
-padding.PaddingTop = UDim.new(0, 8)
-padding.PaddingBottom = UDim.new(0, 8)
+padding.PaddingTop = UDim.new(0, 6)
+padding.PaddingBottom = UDim.new(0, 6)
 padding.Parent = contentScroll
 
 -- ========== FUNGSI GARIS ==========
@@ -560,13 +565,13 @@ end
 -- ========== FUNGSI TOGGLE ==========
 local function createToggle(parent, text, emoji, getState, setState)
     local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(1, 0, 0, 34)
+    frame.Size = UDim2.new(1, 0, 0, 30)
     frame.BackgroundColor3 = Color3.fromRGB(22, 20, 38)
     frame.BackgroundTransparency = 0.2
     frame.BorderSizePixel = 0
     frame.Parent = parent
     local toggleCorner = Instance.new("UICorner")
-    toggleCorner.CornerRadius = UDim.new(0, 8)
+    toggleCorner.CornerRadius = UDim.new(0, 6)
     toggleCorner.Parent = frame
     
     local label = Instance.new("TextLabel")
@@ -576,22 +581,22 @@ local function createToggle(parent, text, emoji, getState, setState)
     label.Text = emoji .. " " .. text
     label.TextColor3 = Color3.fromRGB(210, 210, 240)
     label.Font = Enum.Font.FredokaOne
-    label.TextSize = 11
+    label.TextSize = 10
     label.TextXAlignment = Enum.TextXAlignment.Left
     label.Parent = frame
     
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0, 55, 0, 26)
-    btn.Position = UDim2.new(1, -62, 0.5, -13)
+    btn.Size = UDim2.new(0, 50, 0, 22)
+    btn.Position = UDim2.new(1, -56, 0.5, -11)
     btn.BackgroundColor3 = getState() and Color3.fromRGB(50, 200, 80) or Color3.fromRGB(45, 40, 65)
     btn.Text = getState() and "ON" or "OFF"
     btn.TextColor3 = Color3.fromRGB(255, 255, 255)
     btn.Font = Enum.Font.FredokaOne
-    btn.TextSize = 10
+    btn.TextSize = 9
     btn.BorderSizePixel = 0
     btn.Parent = frame
     local btnCorner = Instance.new("UICorner")
-    btnCorner.CornerRadius = UDim.new(0, 6)
+    btnCorner.CornerRadius = UDim.new(0, 4)
     btnCorner.Parent = btn
     
     btn.MouseButton1Click:Connect(function()
@@ -617,12 +622,12 @@ createToggle(contentScroll, "Auto Roll", "🎲", function() return autoRollActiv
 addSeparator(contentScroll)
 
 local utilTitle = Instance.new("TextLabel")
-utilTitle.Size = UDim2.new(1, 0, 0, 24)
+utilTitle.Size = UDim2.new(1, 0, 0, 22)
 utilTitle.BackgroundTransparency = 1
 utilTitle.Text = "📦 AUTO UTILITY"
 utilTitle.TextColor3 = Color3.fromRGB(0, 200, 255)
 utilTitle.Font = Enum.Font.FredokaOne
-utilTitle.TextSize = 11
+utilTitle.TextSize = 10
 utilTitle.TextXAlignment = Enum.TextXAlignment.Left
 utilTitle.Parent = contentScroll
 
@@ -634,12 +639,12 @@ createToggle(contentScroll, "Auto Buy + Best Zone", "🏪", function() return au
 addSeparator(contentScroll)
 
 local potTitle = Instance.new("TextLabel")
-potTitle.Size = UDim2.new(1, 0, 0, 24)
+potTitle.Size = UDim2.new(1, 0, 0, 22)
 potTitle.BackgroundTransparency = 1
 potTitle.Text = "🧪 AUTO POTION"
 potTitle.TextColor3 = Color3.fromRGB(0, 200, 255)
 potTitle.Font = Enum.Font.FredokaOne
-potTitle.TextSize = 11
+potTitle.TextSize = 10
 potTitle.TextXAlignment = Enum.TextXAlignment.Left
 potTitle.Parent = contentScroll
 
@@ -650,12 +655,12 @@ createToggle(contentScroll, "Roll Speed Potion", "⚡", function() return autoRo
 addSeparator(contentScroll)
 
 local zoneStatus = Instance.new("TextLabel")
-zoneStatus.Size = UDim2.new(1, 0, 0, 18)
+zoneStatus.Size = UDim2.new(1, 0, 0, 16)
 zoneStatus.BackgroundTransparency = 1
 zoneStatus.Text = "🏪 Zone: Ready"
 zoneStatus.TextColor3 = Color3.fromRGB(150, 150, 200)
 zoneStatus.Font = Enum.Font.FredokaOne
-zoneStatus.TextSize = 9
+zoneStatus.TextSize = 8
 zoneStatus.TextXAlignment = Enum.TextXAlignment.Left
 zoneStatus.Parent = contentScroll
 
@@ -681,12 +686,12 @@ end)
 minBtn.MouseButton1Click:Connect(function()
     isMinimized = not isMinimized
     if isMinimized then
-        frame.Size = UDim2.new(0, 280, 0, 60)
+        frame.Size = UDim2.new(0, 280, 0, 55)
         contentScroll.Visible = false
         sideLamp.Visible = false
         minBtn.Text = "+"
     else
-        frame.Size = UDim2.new(0, 280, 0, 460)
+        frame.Size = UDim2.new(0, 280, 0, 400)
         contentScroll.Visible = true
         sideLamp.Visible = true
         minBtn.Text = "−"
@@ -696,9 +701,9 @@ end)
 print("═══════════════════════════════════════════")
 print("   ZAIXPLOIT | SLIME RNG - FINAL")
 print("═══════════════════════════════════════════")
-print("✅ BACKGROUND TRANSPARAN 0.3")
-print("✅ SIDE LAMP DI DALAM FRAME (PASTI KELIHATAN)")
-print("✅ 70 STRIP GRADIENT BERJALAN")
+print("✅ GRADIENT 100 STRIP × 2px (LEBIH HALUS)")
+print("✅ 12 WARNA GRADIENT (BIRU→KUNING→HITAM)")
+print("✅ SIDE LAMP LEBAR 6px")
 print("✅ SEMUA FITUR LENGKAP")
 print("🚀 SCRIPT SIAP DIGUNAKAN")
 print("═══════════════════════════════════════════")
