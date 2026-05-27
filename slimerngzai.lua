@@ -408,7 +408,7 @@ local colorGradient = {
 }
 
 local strips = {}
-for i = 1, 10 do  -- 100 strip
+for i = 1, 100 do  -- 100 strip
     local strip = Instance.new("Frame")
     strip.Size = UDim2.new(1, 0, 0, 2)  -- tinggi 2px
     strip.BackgroundColor3 = colorGradient[(i % #colorGradient) + 1]
