@@ -366,7 +366,7 @@ local frame = Instance.new("Frame")
 frame.Size = UDim2.new(0, 280, 0, 350)
 frame.Position = UDim2.new(0.5, -140, 0.5, -200)
 frame.BackgroundColor3 = Color3.fromRGB(10, 10, 20)
-frame.BackgroundTransparency = 0.5
+frame.BackgroundTransparency = 0.6
 frame.BorderSizePixel = 0
 frame.Active = true
 frame.Draggable = true
@@ -378,33 +378,39 @@ corner.Parent = frame
 
 local stroke = Instance.new("UIStroke")
 stroke.Color = Color3.fromRGB(0, 200, 255)
-stroke.Transparency = 0.4
+stroke.Transparency = 0.5
 stroke.Thickness = 1
 stroke.Parent = frame
 
--- ========== SIDE LAMP GRADIENT BAGUS (100 STRIP, 2px) ==========
+-- ========== SIDE LAMP GRADIENT MAKSIMAL ==========
 local sideLamp = Instance.new("Frame")
-sideLamp.Size = UDim2.new(0, 6, 1, 0)  -- lebih lebar 6px
-sideLamp.Position = UDim2.new(0, 3, 0, 5)
+sideLamp.Size = UDim2.new(0, 8, 1, -5)  -- lebar 8px (lebih tebal), jarak bawah 5px
+sideLamp.Position = UDim2.new(0, 2, 0, 5)  -- posisi geser dikit biar keliatan
 sideLamp.BackgroundTransparency = 1
 sideLamp.BorderSizePixel = 0
 sideLamp.ZIndex = 10
 sideLamp.Parent = frame
 
--- Warna gradient lebih banyak (12 warna)
+-- Warna gradient LENGKAP (biru → kuning → hitam)
 local colorGradient = {
-    Color3.fromRGB(0, 50, 200),
-    Color3.fromRGB(0, 80, 230),
-    Color3.fromRGB(0, 120, 250),
-    Color3.fromRGB(0, 160, 255),
-    Color3.fromRGB(50, 200, 255),
-    Color3.fromRGB(150, 220, 255),
+    Color3.fromRGB(0, 50, 200),     -- Biru gelap
+    Color3.fromRGB(0, 90, 230),     -- Biru medium gelap
+    Color3.fromRGB(0, 130, 250),    -- Biru medium
+    Color3.fromRGB(0, 170, 255),    -- Biru terang
+    Color3.fromRGB(50, 210, 255),   -- Biru muda
+    Color3.fromRGB(150, 230, 255),  -- Biru sangat muda
+    Color3.fromRGB(255, 240, 100),  -- Kuning terang
+    Color3.fromRGB(255, 200, 50),   -- Kuning
+    Color3.fromRGB(255, 150, 0),    -- Oranye
+    Color3.fromRGB(80, 60, 80),     -- Hitam kebiruan
+    Color3.fromRGB(40, 35, 55),     -- Hitam pekat
+    Color3.fromRGB(20, 20, 40),     -- Hitam banget
 }
 
 local strips = {}
-for i = 1, 200 do  -- 100 strip
+for i = 1, 150 do  -- 150 strip (lebih halus)
     local strip = Instance.new("Frame")
-    strip.Size = UDim2.new(1, 0, 0, 4)  -- tinggi 2px
+    strip.Size = UDim2.new(1, 0, 0, 2)  -- tinggi 2px (halus)
     strip.BackgroundColor3 = colorGradient[(i % #colorGradient) + 1]
     strip.BorderSizePixel = 0
     strip.ZIndex = 10
@@ -412,11 +418,13 @@ for i = 1, 200 do  -- 100 strip
     table.insert(strips, strip)
 end
 
+-- Susunan rapat tanpa jarak
 local sideLayout = Instance.new("UIListLayout")
 sideLayout.FillDirection = Enum.FillDirection.Vertical
 sideLayout.Padding = UDim.new(0, 0)
 sideLayout.Parent = sideLamp
 
+-- Animasi berjalan lebih smooth
 local offset = 0
 task.spawn(function()
     while true do
@@ -425,7 +433,7 @@ task.spawn(function()
             strip.BackgroundColor3 = colorGradient[colorIndex]
         end
         offset = offset + 1
-        task.wait(0.06)  -- lebih cepat biar smooth
+        task.wait(0.05)  -- lebih cepat (20fps)
     end
 end)
 
