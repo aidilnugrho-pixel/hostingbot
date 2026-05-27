@@ -366,7 +366,7 @@ local frame = Instance.new("Frame")
 frame.Size = UDim2.new(0, 280, 0, 400)
 frame.Position = UDim2.new(0.5, -140, 0.5, -200)
 frame.BackgroundColor3 = Color3.fromRGB(10, 10, 20)
-frame.BackgroundTransparency = 0.3
+frame.BackgroundTransparency = 0.4
 frame.BorderSizePixel = 0
 frame.Active = true
 frame.Draggable = true
@@ -408,9 +408,9 @@ local colorGradient = {
 }
 
 local strips = {}
-for i = 1, 100 do  -- 100 strip
+for i = 1, 20 do  -- 100 strip
     local strip = Instance.new("Frame")
-    strip.Size = UDim2.new(1, 0, 0, 2)  -- tinggi 2px
+    strip.Size = UDim2.new(1, 0, 0, 4)  -- tinggi 2px
     strip.BackgroundColor3 = colorGradient[(i % #colorGradient) + 1]
     strip.BorderSizePixel = 0
     strip.ZIndex = 10
