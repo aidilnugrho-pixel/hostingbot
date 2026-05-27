@@ -7,7 +7,6 @@ local virtualUser = game:GetService("VirtualUser")
 
 -- ========== VARIABLE UTAMA ==========
 local isMinimized = false
-local isActive = true
 
 -- ========== FITUR TOGGLE STATE ==========
 local autoGunActive = true
@@ -62,7 +61,7 @@ local function findGameplayFolder()
 end
 
 task.spawn(function()
-    while isActive do
+    while true do
         if autoGunActive then
             local gameplay = findGameplayFolder()
             if gameplay then
@@ -239,7 +238,7 @@ task.spawn(function()
         if autoUpgradeActive then
             upgrade()
         end
-        task.wait(0.1)
+        task.wait(1)
     end
 end)
 
@@ -260,41 +259,10 @@ task.spawn(function()
     end
 end)
 
--- ========== AUTO BUY + BEST ZONE (DENGAN STOP SYSTEM) ==========
-local function canBuyZone()
-    local zonesFolder = workspace:FindFirstChild("Zones")
-    if not zonesFolder then return false end
-    local playerZone = localPlayer:FindFirstChild("Zone") or localPlayer:GetAttribute("Zone")
-    local currentZoneNum = tonumber(playerZone) or 0
-    local nextZone = zonesFolder:FindFirstChild(tostring(currentZoneNum + 1))
-    if nextZone then return true end
-    for _, zone in ipairs(zonesFolder:GetChildren()) do
-        local zoneNum = tonumber(zone.Name)
-        if zoneNum and zoneNum > currentZoneNum then return true end
-    end
-    return false
-end
+-- ========== AUTO BUY + BEST ZONE (BUY DULU, BARU TP) ==========
 
-local function purchaseZoneSafe()
-    if not zonesRemote then return false end
-    if maxZoneReached then return false end
-    if not canBuyZone() then
-        maxZoneReached = true
-        print("✅ [AUTO BUY] Max zone reached! Stopping...")
-        return false
-    end
-    local success = pcall(function()
-        zonesRemote:InvokeServer("requestPurchaseZone")
-    end)
-    if not success then
-        maxZoneReached = true
-        return false
-    end
-    return true
-end
-
-local function teleportBestZoneSafe()
-    if not zonesRemote then return end
+-- Cek zona terbaik yang sudah terbuka
+local function getBestOpenZone()
     local bestZone = 0
     local zonesFolder = workspace:FindFirstChild("Zones")
     if zonesFolder then
@@ -303,46 +271,98 @@ local function teleportBestZoneSafe()
             local blocker = gate and gate:FindFirstChild("ClientGateBlocker_"..zone.Name)
             if not blocker or (blocker and not blocker.CanCollide) then
                 local zoneNum = tonumber(zone.Name) or 0
-                if zoneNum > bestZone then bestZone = zoneNum end
+                if zoneNum > bestZone then
+                    bestZone = zoneNum
+                end
             end
         end
     end
-    if bestZone > 0 then
-        pcall(function()
-            zonesRemote:InvokeServer("requestTeleportZone", bestZone)
-        end)
-    end
+    return bestZone
 end
 
+-- Cek apakah bisa beli zona berikutnya
+local function canBuyNextZone()
+    local zonesFolder = workspace:FindFirstChild("Zones")
+    if not zonesFolder then return false end
+    
+    local currentZoneNum = getBestOpenZone()
+    local nextZone = zonesFolder:FindFirstChild(tostring(currentZoneNum + 1))
+    return nextZone ~= nil
+end
+
+-- Beli zona
+local function tryBuyZone()
+    if not zonesRemote then return false end
+    if maxZoneReached then return false end
+    
+    if not canBuyNextZone() then
+        maxZoneReached = true
+        autoBuyZoneActive = false
+        print("✅ [AUTO BUY] Max zone reached! Auto Buy disabled.")
+        return false
+    end
+    
+    local success = pcall(function()
+        zonesRemote:InvokeServer("requestPurchaseZone")
+    end)
+    
+    if not success then
+        maxZoneReached = true
+        autoBuyZoneActive = false
+        print("✅ [AUTO BUY] Purchase failed! Auto Buy disabled.")
+        return false
+    end
+    
+    print("✅ [AUTO BUY] Zone purchased!")
+    return true
+end
+
+-- Teleport ke best zone
+local function tryTeleportToBestZone()
+    if not zonesRemote then return false end
+    
+    local bestZone = getBestOpenZone()
+    
+    if bestZone == 0 then
+        autoBuyZoneActive = false
+        print("✅ [AUTO ZONE] No open zone to teleport! Auto Buy disabled.")
+        return false
+    end
+    
+    pcall(function()
+        zonesRemote:InvokeServer("requestTeleportZone", bestZone)
+    end)
+    
+    print("✅ [AUTO ZONE] Teleported to zone:", bestZone)
+    return true
+end
+
+-- LOOP UTAMA (BUY DULU, BARU TP)
 task.spawn(function()
     while true do
         if autoBuyZoneActive then
-            if not maxZoneReached then
-                local bought = purchaseZoneSafe()
-                if bought then
-                    task.wait(1)
-                    teleportBestZoneSafe()
-                end
+            local bought = tryBuyZone()
+            if bought then
+                task.wait(1)
+                tryTeleportToBestZone()
             end
         end
         task.wait(5)
     end
 end)
 
--- Reset max zone flag setiap 2 menit
+-- Reset flag setiap 2 menit
 task.spawn(function()
     while true do
         task.wait(120)
-        if autoBuyZoneActive and maxZoneReached then
-            if canBuyZone() then
-                maxZoneReached = false
-                print("✅ [AUTO BUY] New zone detected! Resuming...")
-            end
+        if maxZoneReached and canBuyNextZone() then
+            maxZoneReached = false
+            print("✅ [AUTO BUY] New zone detected! You can re-enable Auto Buy.")
         end
     end
 end)
 
--- ========== AUTO POTIONS (DELAY 1 DETIK SEMUA) ==========
+-- ========== AUTO POTIONS (DELAY 1 DETIK) ==========
 local function useBoost(boostType)
     if not boostRemote then return end
     pcall(function()
@@ -392,8 +412,8 @@ screenGui.ResetOnSpawn = false
 screenGui.Parent = localPlayer:WaitForChild("PlayerGui")
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 280, 0, 400)
-frame.Position = UDim2.new(0.5, -140, 0.5, -200)
+frame.Size = UDim2.new(0, 300, 0, 480)
+frame.Position = UDim2.new(0.5, -150, 0.5, -240)
 frame.BackgroundColor3 = Color3.fromRGB(10, 10, 20)
 frame.BackgroundTransparency = 0.15
 frame.BorderSizePixel = 0
@@ -411,10 +431,10 @@ stroke.Transparency = 0.5
 stroke.Thickness = 1
 stroke.Parent = frame
 
--- ========== SIDE LAMP GRADIENT BERJALAN ==========
+-- ========== SIDE LAMP GRADIENT BERJALAN (FULL PANJANG) ==========
 local sideLamp = Instance.new("Frame")
-sideLamp.Size = UDim2.new(0, 5, 1, -10)
-sideLamp.Position = UDim2.new(0, -7, 0, 5)
+sideLamp.Size = UDim2.new(0, 5, 1, -8)
+sideLamp.Position = UDim2.new(0, -7, 0, 4)
 sideLamp.BackgroundTransparency = 1
 sideLamp.BorderSizePixel = 0
 sideLamp.Parent = frame
@@ -431,7 +451,7 @@ local colorGradient = {
 }
 
 local strips = {}
-for i = 1, 20 do
+for i = 1, 24 do
     local strip = Instance.new("Frame")
     strip.Size = UDim2.new(1, 0, 0, 5)
     strip.BackgroundColor3 = colorGradient[(i % #colorGradient) + 1]
@@ -457,9 +477,9 @@ task.spawn(function()
     end
 end)
 
--- ========== TITLE BAR ==========
+-- ========== TITLE BAR (3 BARIS) ==========
 local titleBar = Instance.new("Frame")
-titleBar.Size = UDim2.new(1, 0, 0, 45)
+titleBar.Size = UDim2.new(1, 0, 0, 60)
 titleBar.BackgroundColor3 = Color3.fromRGB(20, 18, 35)
 titleBar.BackgroundTransparency = 0.3
 titleBar.BorderSizePixel = 0
@@ -486,6 +506,7 @@ task.spawn(function()
     end
 end)
 
+-- Baris 1: ZAIXPLOIT
 local titleText = Instance.new("TextLabel")
 titleText.Size = UDim2.new(1, -80, 0, 18)
 titleText.Position = UDim2.new(0, 28, 0, 6)
@@ -497,20 +518,34 @@ titleText.TextSize = 14
 titleText.TextXAlignment = Enum.TextXAlignment.Left
 titleText.Parent = titleBar
 
+-- Baris 2: SLIME RNG
 local subTitleText = Instance.new("TextLabel")
 subTitleText.Size = UDim2.new(1, -80, 0, 12)
-subTitleText.Position = UDim2.new(0, 28, 0, 26)
+subTitleText.Position = UDim2.new(0, 28, 0, 24)
 subTitleText.BackgroundTransparency = 1
 subTitleText.Text = "SLIME RNG"
 subTitleText.TextColor3 = Color3.fromRGB(0, 200, 255)
 subTitleText.Font = Enum.Font.FredokaOne
-subTitleText.TextSize = 9
+subTitleText.TextSize = 10
 subTitleText.TextXAlignment = Enum.TextXAlignment.Left
 subTitleText.Parent = titleBar
 
+-- Baris 3: Nama Display | Username
+local infoText = Instance.new("TextLabel")
+infoText.Size = UDim2.new(1, -80, 0, 12)
+infoText.Position = UDim2.new(0, 28, 0, 40)
+infoText.BackgroundTransparency = 1
+infoText.Text = localPlayer.DisplayName .. " | " .. localPlayer.Name
+infoText.TextColor3 = Color3.fromRGB(150, 150, 200)
+infoText.Font = Enum.Font.FredokaOne
+infoText.TextSize = 8
+infoText.TextXAlignment = Enum.TextXAlignment.Left
+infoText.Parent = titleBar
+
+-- MINIMIZE BUTTON
 local minBtn = Instance.new("TextButton")
 minBtn.Size = UDim2.new(0, 22, 0, 22)
-minBtn.Position = UDim2.new(1, -30, 0, 11)
+minBtn.Position = UDim2.new(1, -30, 0, 19)
 minBtn.BackgroundColor3 = Color3.fromRGB(50, 45, 70)
 minBtn.BackgroundTransparency = 0.3
 minBtn.Text = "−"
@@ -525,8 +560,8 @@ minCorner.Parent = minBtn
 
 -- ========== SCROLLING FRAME ==========
 local contentScroll = Instance.new("ScrollingFrame")
-contentScroll.Size = UDim2.new(1, 0, 1, -45)
-contentScroll.Position = UDim2.new(0, 0, 0, 45)
+contentScroll.Size = UDim2.new(1, 0, 1, -60)
+contentScroll.Position = UDim2.new(0, 0, 0, 60)
 contentScroll.BackgroundTransparency = 1
 contentScroll.ScrollBarThickness = 4
 contentScroll.ScrollBarImageColor3 = Color3.fromRGB(0, 150, 255)
@@ -540,8 +575,8 @@ contentLayout.SortOrder = Enum.SortOrder.LayoutOrder
 contentLayout.Parent = contentScroll
 
 local padding = Instance.new("UIPadding")
-padding.PaddingLeft = UDim.new(0, 10)
-padding.PaddingRight = UDim.new(0, 10)
+padding.PaddingLeft = UDim.new(0, 12)
+padding.PaddingRight = UDim.new(0, 12)
 padding.PaddingTop = UDim.new(0, 8)
 padding.PaddingBottom = UDim.new(0, 8)
 padding.Parent = contentScroll
@@ -602,6 +637,7 @@ end
 createToggle(contentScroll, "Auto Gun", "🔫", function() return autoGunActive end, function(v) autoGunActive = v end)
 createToggle(contentScroll, "Auto Roll", "🎲", function() return autoRollActive end, function(v) autoRollActive = v end)
 
+-- Utility Section Title
 local utilTitle = Instance.new("TextLabel")
 utilTitle.Size = UDim2.new(1, 0, 0, 24)
 utilTitle.BackgroundTransparency = 1
@@ -619,6 +655,7 @@ createToggle(contentScroll, "Auto Upgrade", "⬆️", function() return autoUpgr
 createToggle(contentScroll, "Auto Rebirth", "🔄", function() return autoRebirthActive end, function(v) autoRebirthActive = v end)
 createToggle(contentScroll, "Auto Buy + Best Zone", "🏪", function() return autoBuyZoneActive end, function(v) autoBuyZoneActive = v end)
 
+-- Potion Section Title
 local potTitle = Instance.new("TextLabel")
 potTitle.Size = UDim2.new(1, 0, 0, 24)
 potTitle.BackgroundTransparency = 1
@@ -634,7 +671,7 @@ createToggle(contentScroll, "Ultra Luck Potion", "⭐", function() return autoUl
 createToggle(contentScroll, "Currency Potion", "💵", function() return autoCurrencyActive end, function(v) autoCurrencyActive = v end)
 createToggle(contentScroll, "Roll Speed Potion", "⚡", function() return autoRollSpeedActive end, function(v) autoRollSpeedActive = v end)
 
--- Status Zone
+-- Zone Status
 local zoneStatus = Instance.new("TextLabel")
 zoneStatus.Size = UDim2.new(1, 0, 0, 18)
 zoneStatus.BackgroundTransparency = 1
@@ -667,12 +704,12 @@ end)
 minBtn.MouseButton1Click:Connect(function()
     isMinimized = not isMinimized
     if isMinimized then
-        frame.Size = UDim2.new(0, 280, 0, 45)
+        frame.Size = UDim2.new(0, 300, 0, 60)
         contentScroll.Visible = false
         sideLamp.Visible = false
         minBtn.Text = "+"
     else
-        frame.Size = UDim2.new(0, 280, 0, 400)
+        frame.Size = UDim2.new(0, 300, 0, 480)
         contentScroll.Visible = true
         sideLamp.Visible = true
         minBtn.Text = "−"
@@ -685,7 +722,8 @@ print("════════════════════════�
 print("✅ AUTO GUN (0.033s) | AUTO ROLL (0.033s)")
 print("✅ AUTO INDEX (5s) | AUTO POTION (1s)")
 print("✅ AUTO FARM LOOT & FRUIT (0.5s)")
-print("✅ AUTO BUY ZONE + STOP SYSTEM")
-print("✅ SIDE LAMP GRADIENT BERJALAN")
+print("✅ AUTO BUY ZONE (BELI DULU, BARU TP)")
+print("✅ SIDE LAMP GRADIENT BERJALAN (FULL)")
+print("✅ ANTI AFK + DELETE AUTOREJOIN")
 print("🚀 SCRIPT SIAP DIGUNAKAN")
 print("═══════════════════════════════════════════")
