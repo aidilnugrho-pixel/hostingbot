@@ -356,17 +356,15 @@ end
 deleteAutoRejoinService()
 task.spawn(function() while true do task.wait(10) deleteAutoRejoinService() end end)
 
--- ========== CREATE GUI ==========
+-- ========== CREATE GUI MAKSIMAL (AMAN) ==========
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "ZAIXPLOIT"
 screenGui.ResetOnSpawn = false
-screenGui.IgnoreGuiInset = true
-screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 screenGui.Parent = localPlayer:WaitForChild("PlayerGui")
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 300, 0, 420)
-frame.Position = UDim2.new(0.5, -150, 0.5, -210)
+frame.Size = UDim2.new(0, 290, 0, 410)
+frame.Position = UDim2.new(0.5, -145, 0.5, -205)
 frame.BackgroundColor3 = Color3.fromRGB(8, 8, 18)
 frame.BackgroundTransparency = 0.35
 frame.BorderSizePixel = 0
@@ -374,24 +372,15 @@ frame.Active = true
 frame.Draggable = true
 frame.Parent = screenGui
 
--- Corner (sudut melengkung)
 local corner = Instance.new("UICorner")
-corner.CornerRadius = UDim.new(0, 14)
+corner.CornerRadius = UDim.new(0, 13)
 corner.Parent = frame
 
--- Stroke (garis tepi)
 local stroke = Instance.new("UIStroke")
-stroke.Color = Color3.fromRGB(0, 180, 255)
+stroke.Color = Color3.fromRGB(0, 190, 255)
 stroke.Transparency = 0.25
-stroke.Thickness = 1.5
+stroke.Thickness = 1
 stroke.Parent = frame
-
--- Shadow (bayangan) biar lebih elegan
-local shadow = Instance.new("UIShadow")
-shadow.Color = Color3.fromRGB(0, 0, 0)
-shadow.Transparency = 0.6
-shadow.Size = 8
-shadow.Parent = frame
 
 -- ========== SIDE LAMP GRADIENT (BIRU MUDA KE BIRU TUA) ==========
 local sideLamp = Instance.new("Frame")
