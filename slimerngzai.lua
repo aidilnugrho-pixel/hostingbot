@@ -22,7 +22,9 @@ local AutoCurrency = false
 local AutoRollSpeed = false
 
 -- ========== AUTO UFO (DEFAULT ON) ==========
-local AutoUfo = true  -- Langsung ON saat execute
+local AutoUfo = true          -- DEFAULT ON
+local UFO_INTERVAL = 10       -- Teleport ke UFO setiap 10 detik
+local alreadyInZone40 = false -- Flag untuk teleport Zone 40 hanya sekali
 
 local function GetRemote(Name)
     local Success, Remote = pcall(function()
@@ -217,7 +219,7 @@ local function UseBoost(Type)
     pcall(function() BoostSvc:InvokeServer("requestUseBoost", Type) end)
 end
 
--- ========== AUTO UFO TELEPORT FUNCTION ==========
+-- ========== AUTO UFO TELEPORT FUNCTIONS ==========
 local function TeleportToUfo()
     if not AutoUfo then return false end
     
@@ -237,16 +239,62 @@ local function TeleportToUfo()
     local hrp = char.HumanoidRootPart
     local ufoPos = ufoRoot.Position
     hrp.CFrame = CFrame.new(ufoPos.X, hrp.Position.Y, ufoPos.Z)
+    
+    print("🛸 Teleport ke UFO!")
     return true
 end
 
--- Loop Auto UFO (teleport setiap 15 detik)
+local function TeleportToZone40()
+    if not AutoUfo then return false end
+    
+    local targetPart = workspace:FindFirstChild("Zones") 
+        and workspace.Zones:FindFirstChild("40") 
+        and workspace.Zones["40"]:FindFirstChild("POI") 
+        and workspace.Zones["40"].POI:FindFirstChild("PlayerSpawn")
+    
+    if not targetPart or not targetPart:IsA("BasePart") then
+        print("❌ Zone 40 Spawn tidak ditemukan")
+        return false
+    end
+    
+    local char = LocalPlayer.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then
+        return false
+    end
+    
+    local hrp = char.HumanoidRootPart
+    local targetPos = targetPart.Position
+    hrp.CFrame = CFrame.new(targetPos.X, targetPos.Y + 3, targetPos.Z)
+    
+    print("📍 Teleport ke Zone 40 Spawn (SEKALI SAJA)")
+    return true
+end
+
+-- ========== LOOP AUTO UFO ==========
 task.spawn(function()
     while true do
-        if AutoUfo then
-            TeleportToUfo()
+        task.wait(UFO_INTERVAL)
+        
+        if not AutoUfo then 
+            -- Reset flag kalau auto ufo dimatikan
+            alreadyInZone40 = false
+            print("🛸 Auto UFO: OFF")
+            continue 
         end
-        task.wait(15)
+        
+        local ufoAda = TeleportToUfo()
+        
+        if ufoAda then
+            -- UFO ada, reset flag zone40
+            alreadyInZone40 = false
+        else
+            -- UFO tidak ada
+            if not alreadyInZone40 then
+                TeleportToZone40()
+                alreadyInZone40 = true
+                print("⏸️ UFO tidak ada, sudah di Zone 40. Menunggu UFO spawn...")
+            end
+        end
     end
 end)
 
@@ -326,8 +374,8 @@ GUI.ResetOnSpawn = false
 GUI.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
 local Main = Instance.new("Frame")
-Main.Size = UDim2.new(0, 240, 0, 380)
-Main.Position = UDim2.new(0.5, -120, 0.5, -190)
+Main.Size = UDim2.new(0, 240, 0, 420)
+Main.Position = UDim2.new(0.5, -120, 0.5, -210)
 Main.BackgroundColor3 = Color3.fromRGB(8, 6, 15)
 Main.BackgroundTransparency = 0.05
 Main.BorderSizePixel = 0
@@ -519,7 +567,7 @@ Padding.Parent = Scroll
 -- ========== GUI COMPONENTS ==========
 local function MakeModeToggle(Parent, Text, Emoji, GetMode, SetMode)
     local Frame = Instance.new("Frame")
-    Frame.Size = UDim2.new(1, 0, 0, 28)
+    Frame.Size = UDim2.new(1, 0, 0, 32)
     Frame.BackgroundColor3 = Color3.fromRGB(18, 16, 32)
     Frame.BackgroundTransparency = 0.2
     Frame.BorderSizePixel = 0
@@ -535,22 +583,22 @@ local function MakeModeToggle(Parent, Text, Emoji, GetMode, SetMode)
     Label.Text = Emoji .. " " .. Text
     Label.TextColor3 = Color3.fromRGB(200, 200, 230)
     Label.Font = Enum.Font.FredokaOne
-    Label.TextSize = 9
+    Label.TextSize = 11
     Label.TextXAlignment = Enum.TextXAlignment.Left
     Label.Parent = Frame
     
     local Btn = Instance.new("TextButton")
-    Btn.Size = UDim2.new(0, 50, 0, 20)
-    Btn.Position = UDim2.new(1, -56, 0.5, -10)
+    Btn.Size = UDim2.new(0, 60, 0, 24)
+    Btn.Position = UDim2.new(1, -68, 0.5, -12)
     Btn.BackgroundColor3 = Color3.fromRGB(50, 150, 255)
     Btn.Text = "NORMAL"
     Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
     Btn.Font = Enum.Font.FredokaOne
-    Btn.TextSize = 8
+    Btn.TextSize = 10
     Btn.BorderSizePixel = 0
     Btn.Parent = Frame
     local BtnCorner = Instance.new("UICorner")
-    BtnCorner.CornerRadius = UDim.new(0, 4)
+    BtnCorner.CornerRadius = UDim.new(0, 5)
     BtnCorner.Parent = Btn
     
     local function UpdateButton()
@@ -585,7 +633,7 @@ end
 
 local function MakeToggle(Parent, Text, Emoji, GetState, SetState)
     local Frame = Instance.new("Frame")
-    Frame.Size = UDim2.new(1, 0, 0, 24)
+    Frame.Size = UDim2.new(1, 0, 0, 28)
     Frame.BackgroundColor3 = Color3.fromRGB(18, 16, 32)
     Frame.BackgroundTransparency = 0.2
     Frame.BorderSizePixel = 0
@@ -601,22 +649,22 @@ local function MakeToggle(Parent, Text, Emoji, GetState, SetState)
     Label.Text = Emoji .. " " .. Text
     Label.TextColor3 = Color3.fromRGB(200, 200, 230)
     Label.Font = Enum.Font.FredokaOne
-    Label.TextSize = 9
+    Label.TextSize = 10
     Label.TextXAlignment = Enum.TextXAlignment.Left
     Label.Parent = Frame
     
     local Btn = Instance.new("TextButton")
-    Btn.Size = UDim2.new(0, 40, 0, 18)
-    Btn.Position = UDim2.new(1, -46, 0.5, -9)
+    Btn.Size = UDim2.new(0, 50, 0, 22)
+    Btn.Position = UDim2.new(1, -58, 0.5, -11)
     Btn.BackgroundColor3 = GetState() and Color3.fromRGB(50, 150, 255) or Color3.fromRGB(70, 70, 70)
     Btn.Text = GetState() and "ON" or "OFF"
     Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
     Btn.Font = Enum.Font.FredokaOne
-    Btn.TextSize = 8
+    Btn.TextSize = 10
     Btn.BorderSizePixel = 0
     Btn.Parent = Frame
     local BtnCorner = Instance.new("UICorner")
-    BtnCorner.CornerRadius = UDim.new(0, 4)
+    BtnCorner.CornerRadius = UDim.new(0, 5)
     BtnCorner.Parent = Btn
     
     Btn.MouseButton1Click:Connect(function()
@@ -631,12 +679,12 @@ end
 
 local function MakeTitle(Parent, Text)
     local Label = Instance.new("TextLabel")
-    Label.Size = UDim2.new(1, 0, 0, 18)
+    Label.Size = UDim2.new(1, 0, 0, 20)
     Label.BackgroundTransparency = 1
     Label.Text = Text
     Label.TextColor3 = Color3.fromRGB(0, 150, 255)
     Label.Font = Enum.Font.FredokaOne
-    Label.TextSize = 9
+    Label.TextSize = 11
     Label.TextXAlignment = Enum.TextXAlignment.Left
     Label.Parent = Parent
     return Label
@@ -652,47 +700,48 @@ local function MakeSep(Parent)
     return Line
 end
 
--- ========== AUTO UFO TOGGLE (PALING ATAS, DEFAULT ON) ==========
+-- ========== AUTO UFO TOGGLE (BESAR, WARNA BIRU, PALING ATAS) ==========
 local UfoFrame = Instance.new("Frame")
-UfoFrame.Size = UDim2.new(1, 0, 0, 28)
+UfoFrame.Size = UDim2.new(1, 0, 0, 38)
 UfoFrame.BackgroundColor3 = Color3.fromRGB(18, 16, 32)
 UfoFrame.BackgroundTransparency = 0.2
 UfoFrame.BorderSizePixel = 0
 UfoFrame.Parent = Scroll
 local UfoCorner = Instance.new("UICorner")
-UfoCorner.CornerRadius = UDim.new(0, 5)
+UfoCorner.CornerRadius = UDim.new(0, 6)
 UfoCorner.Parent = UfoFrame
 
 local UfoLabel = Instance.new("TextLabel")
-UfoLabel.Size = UDim2.new(1, -55, 1, 0)
-UfoLabel.Position = UDim2.new(0, 6, 0, 0)
+UfoLabel.Size = UDim2.new(1, -65, 1, 0)
+UfoLabel.Position = UDim2.new(0, 10, 0, 0)
 UfoLabel.BackgroundTransparency = 1
-UfoLabel.Text = "🛸 Auto UFO"
-UfoLabel.TextColor3 = Color3.fromRGB(200, 200, 230)
+UfoLabel.Text = "🛸 Auto UFO (10s)"
+UfoLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 UfoLabel.Font = Enum.Font.FredokaOne
-UfoLabel.TextSize = 9
+UfoLabel.TextSize = 12
 UfoLabel.TextXAlignment = Enum.TextXAlignment.Left
 UfoLabel.Parent = UfoFrame
 
 local UfoBtn = Instance.new("TextButton")
-UfoBtn.Size = UDim2.new(0, 40, 0, 18)
-UfoBtn.Position = UDim2.new(1, -46, 0.5, -9)
-UfoBtn.BackgroundColor3 = AutoUfo and Color3.fromRGB(0, 180, 0) or Color3.fromRGB(70, 70, 70)
+UfoBtn.Size = UDim2.new(0, 60, 0, 28)
+UfoBtn.Position = UDim2.new(1, -70, 0.5, -14)
+UfoBtn.BackgroundColor3 = AutoUfo and Color3.fromRGB(0, 100, 255) or Color3.fromRGB(70, 70, 70)
 UfoBtn.Text = AutoUfo and "ON" or "OFF"
 UfoBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 UfoBtn.Font = Enum.Font.FredokaOne
-UfoBtn.TextSize = 8
+UfoBtn.TextSize = 12
 UfoBtn.BorderSizePixel = 0
 UfoBtn.Parent = UfoFrame
 local UfoBtnCorner = Instance.new("UICorner")
-UfoBtnCorner.CornerRadius = UDim.new(0, 4)
+UfoBtnCorner.CornerRadius = UDim.new(0, 6)
 UfoBtnCorner.Parent = UfoBtn
 
 UfoBtn.MouseButton1Click:Connect(function()
     AutoUfo = not AutoUfo
     if AutoUfo then
-        UfoBtn.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
+        UfoBtn.BackgroundColor3 = Color3.fromRGB(0, 100, 255)
         UfoBtn.Text = "ON"
+        alreadyInZone40 = false  -- Reset flag saat ON
         print("🛸 Auto UFO: ON")
     else
         UfoBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
@@ -733,12 +782,12 @@ MakeToggle(Scroll, "Currency Potion", "💵", function() return AutoCurrency end
 MakeToggle(Scroll, "Roll Speed Potion", "⚡", function() return AutoRollSpeed end, function(v) AutoRollSpeed = v end)
 
 local Status = Instance.new("TextLabel")
-Status.Size = UDim2.new(1, -20, 0, 14)
+Status.Size = UDim2.new(1, -20, 0, 16)
 Status.BackgroundTransparency = 1
 Status.Text = "● ANTI AFK ACTIVE"
 Status.TextColor3 = Color3.fromRGB(100, 255, 100)
 Status.Font = Enum.Font.FredokaOne
-Status.TextSize = 8
+Status.TextSize = 10
 Status.TextXAlignment = Enum.TextXAlignment.Left
 Status.Parent = Scroll
 
@@ -750,7 +799,7 @@ MinBtn.MouseButton1Click:Connect(function()
         SideLamp.Visible = false
         MinBtn.Text = "+"
     else
-        Main.Size = UDim2.new(0, 240, 0, 380)
+        Main.Size = UDim2.new(0, 240, 0, 420)
         Scroll.Visible = true
         SideLamp.Visible = true
         MinBtn.Text = "−"
@@ -760,7 +809,9 @@ end)
 print("═══════════════════════════════════════════")
 print("   ZAIXPLOIT | SLIME RNG + AUTO UFO")
 print("═══════════════════════════════════════════")
-print("✅ AUTO UFO (ON by default) - Teleport 15s")
+print("✅ AUTO UFO (ON by default) - Teleport 10s")
+print("   → Ada UFO: Teleport ke UFO")
+print("   → Tidak ada: Teleport ke Zone 40 (SEKALI)")
 print("✅ AUTO GUN | AUTO ROLL (OFF/NORMAL/FAST)")
 print("✅ AUTO INDEX | AUTO FARM LOOT | AUTO FARM FRUIT")
 print("✅ AUTO UPGRADE | AUTO REBIRTH")
