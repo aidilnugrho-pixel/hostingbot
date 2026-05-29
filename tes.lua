@@ -1,11 +1,11 @@
--- ========== AUTO ZONE DETECT - 1x TELEPORT PER PERUBAHAN ==========
+-- ========== AUTO UFO (DETECT UI + BEST ZONE) ==========
 local Players = game:GetService("Players")
-local player = Players.LocalPlayer
+local LocalPlayer = Players.LocalPlayer
+local UserInputService = game:GetService("UserInputService")
 
 -- ========== KONFIGURASI ==========
-local autoEnabled = true
-local lastText = nil  -- PENTING! UNTUK CEK PERUBAHAN
-local isProcessing = false
+local autoUfoEnabled = true
+local lastUIText = nil
 
 -- ========== DATA NAMA ZONE (1-40) ==========
 local zoneList = {
@@ -51,13 +51,32 @@ local zoneList = {
     { num = 40, name = "Racetrack", patterns = {"racetrack", "race"} }
 }
 
--- ========== FUNGSI BACA UI ==========
+-- ========== FUNGSI GET BEST OPEN ZONE (COLIN) ==========
+local function GetBestOpenZone()
+    local Best = 0
+    local Zones = workspace:FindFirstChild("Zones")
+    if Zones then
+        for _, Zone in ipairs(Zones:GetChildren()) do
+            local Num = tonumber(Zone.Name) or 0
+            if Num > 0 and Num <= 40 then
+                local Gate = Zone:FindFirstChild("Gate")
+                local Blocker = Gate and Gate:FindFirstChild("ClientGateBlocker_"..Num)
+                if Blocker and not Blocker.CanCollide and Num > Best then
+                    Best = Num
+                end
+            end
+        end
+    end
+    return Best
+end
+
+-- ========== BACA UI ==========
 local function getUIText()
-    local ufoUI = player.PlayerGui:FindFirstChild("Root") 
-        and player.PlayerGui.Root:FindFirstChild("UfoStatusRoot")
+    local ufoUI = LocalPlayer.PlayerGui:FindFirstChild("Root") 
+        and LocalPlayer.PlayerGui.Root:FindFirstChild("UfoStatusRoot")
     
     if not ufoUI then
-        ufoUI = player.PlayerGui:FindFirstChild("UfoStatusRoot")
+        ufoUI = LocalPlayer.PlayerGui:FindFirstChild("UfoStatusRoot")
     end
     
     if not ufoUI then
@@ -95,27 +114,8 @@ local function detectZoneFromText(text)
     return nil, nil
 end
 
--- ========== FUNGSI BEST ZONE ==========
-local function GetBestOpenZone()
-    local Best = 0
-    local Zones = workspace:FindFirstChild("Zones")
-    if Zones then
-        for _, Zone in ipairs(Zones:GetChildren()) do
-            local Num = tonumber(Zone.Name) or 0
-            if Num > 0 and Num <= 40 then
-                local Gate = Zone:FindFirstChild("Gate")
-                local Blocker = Gate and Gate:FindFirstChild("ClientGateBlocker_"..Num)
-                if Blocker and not Blocker.CanCollide and Num > Best then
-                    Best = Num
-                end
-            end
-        end
-    end
-    return Best
-end
-
 -- ========== TELEPORT KE ZONE ==========
-local function teleportToZone(zoneNum, zoneName)
+local function TeleportToZone(zoneNum)
     local targetPart = workspace:FindFirstChild("Zones") 
         and workspace.Zones:FindFirstChild(tostring(zoneNum)) 
         and workspace.Zones[tostring(zoneNum)]:FindFirstChild("POI") 
@@ -130,57 +130,44 @@ local function teleportToZone(zoneNum, zoneName)
         return false
     end
     
-    local char = player.Character
+    local char = LocalPlayer.Character
     if not char or not char:FindFirstChild("HumanoidRootPart") then
         return false
     end
     
     local hrp = char.HumanoidRootPart
     hrp.CFrame = CFrame.new(targetPart.Position.X, targetPart.Position.Y + 3, targetPart.Position.Z)
-    print("✅ Teleport ke " .. (zoneName or "Zone " .. zoneNum))
+    print("✅ Teleport ke Zone " .. zoneNum)
     return true
 end
 
--- ========== PROSES TEKS (HANYA 1x SAAT BERUBAH) ==========
+-- ========== PROSES TEKS (1x PER PERUBAHAN) ==========
 local function processText(currentText)
-    if isProcessing then return end
-    if currentText == lastText then 
-        -- TEKS SAMA, SKIP
-        return 
-    end
-    
-    isProcessing = true
+    if currentText == lastUIText then return end
     
     local zoneNum, zoneName = detectZoneFromText(currentText)
     
     if zoneNum then
-        -- ZONE TERDETEKSI
-        print("🎯 [BERUBAH] " .. currentText .. " → Teleport ke " .. zoneName)
-        teleportToZone(zoneNum, zoneName)
+        print("🎯 " .. currentText .. " → Teleport ke " .. zoneName)
+        TeleportToZone(zoneNum)
     else
-        -- ZONE TIDAK TERDETEKSI → BEST ZONE
-        print("❌ [BERUBAH] " .. currentText .. " → Teleport ke Best Zone")
         local bestZone = GetBestOpenZone()
-        local targetZone = bestZone + 1
-        if targetZone <= 40 then
-            print("📍 Colin: " .. bestZone .. " → Target: " .. targetZone)
-            teleportToZone(targetZone, "Best Zone")
-        else
-            print("🏆 Sudah di zone maksimal 40!")
+        if bestZone > 0 then
+            print("❌ " .. currentText .. " → Teleport ke Best Zone: " .. bestZone)
+            TeleportToZone(bestZone)
         end
     end
     
-    lastText = currentText  -- SIMPAN TEKS YANG SUDAH DIPROSES
-    isProcessing = false
+    lastUIText = currentText
 end
 
 -- ========== LOOP ==========
 task.spawn(function()
     while true do
-        if autoEnabled then
+        if autoUfoEnabled then
             local currentText = getUIText()
             if currentText then
-                processText(currentText)  -- HANYA PROSES JIKA BERUBAH
+                processText(currentText)
             end
         end
         task.wait(0.5)
@@ -189,9 +176,9 @@ end)
 
 -- ========== GUI ==========
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "AutoZoneDetect"
+screenGui.Name = "AutoUfoBestZone"
 screenGui.ResetOnSpawn = false
-screenGui.Parent = player:WaitForChild("PlayerGui")
+screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
 local frame = Instance.new("Frame")
 frame.Size = UDim2.new(0, 320, 0, 150)
@@ -240,7 +227,7 @@ local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, -80, 1, 0)
 title.Position = UDim2.new(0, 15, 0, 0)
 title.BackgroundTransparency = 1
-title.Text = "🛸 AUTO ZONE DETECT"
+title.Text = "🛸 AUTO UFO"
 title.TextColor3 = Color3.fromRGB(255, 215, 0)
 title.Font = Enum.Font.GothamBold
 title.TextSize = 12
@@ -251,8 +238,8 @@ title.Parent = titleBar
 local toggleBtn = Instance.new("TextButton")
 toggleBtn.Size = UDim2.new(0, 60, 0, 26)
 toggleBtn.Position = UDim2.new(1, -72, 0.5, -13)
-toggleBtn.BackgroundColor3 = autoEnabled and Color3.fromRGB(50, 200, 80) or Color3.fromRGB(200, 50, 50)
-toggleBtn.Text = autoEnabled and "ON" or "OFF"
+toggleBtn.BackgroundColor3 = autoUfoEnabled and Color3.fromRGB(50, 200, 80) or Color3.fromRGB(200, 50, 50)
+toggleBtn.Text = autoUfoEnabled and "ON" or "OFF"
 toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 toggleBtn.Font = Enum.Font.GothamBold
 toggleBtn.TextSize = 12
@@ -321,7 +308,30 @@ actionLabel.TextSize = 10
 actionLabel.TextXAlignment = Enum.TextXAlignment.Left
 actionLabel.Parent = frame
 
--- Update UI Status
+-- Toggle function
+toggleBtn.MouseButton1Click:Connect(function()
+    autoUfoEnabled = not autoUfoEnabled
+    if autoUfoEnabled then
+        toggleBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 80)
+        toggleBtn.Text = "ON"
+        sideLamp.BackgroundColor3 = Color3.fromRGB(0, 255, 100)
+        statusText.Text = "✅ AUTO UFO ON"
+        statusText.TextColor3 = Color3.fromRGB(100, 255, 100)
+        print("🟢 Auto UFO: ON")
+        task.wait(2)
+        statusText.Text = "📡 Menunggu perubahan..."
+        statusText.TextColor3 = Color3.fromRGB(200, 200, 220)
+    else
+        toggleBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        toggleBtn.Text = "OFF"
+        sideLamp.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+        statusText.Text = "⏸️ AUTO UFO OFF"
+        statusText.TextColor3 = Color3.fromRGB(255, 150, 150)
+        print("🔴 Auto UFO: OFF")
+    end
+end)
+
+-- Update UI
 task.spawn(function()
     while true do
         if screenGui and screenGui.Parent then
@@ -334,17 +344,16 @@ task.spawn(function()
                 if zoneNum then
                     zoneStatusLabel.Text = "🗺️ Status: Zone terdeteksi! (" .. zoneName .. ")"
                     zoneStatusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
-                    if autoEnabled then
+                    if autoUfoEnabled then
                         actionLabel.Text = "⚡ Aksi: Teleport ke " .. zoneName
                         actionLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
                     end
                 else
                     zoneStatusLabel.Text = "🗺️ Status: Zone tidak terdeteksi"
                     zoneStatusLabel.TextColor3 = Color3.fromRGB(255, 150, 100)
-                    if autoEnabled then
+                    if autoUfoEnabled then
                         local bestZone = GetBestOpenZone()
-                        local targetZone = bestZone + 1
-                        actionLabel.Text = "⚡ Aksi: Teleport ke Best Zone " .. targetZone
+                        actionLabel.Text = "⚡ Aksi: Teleport ke Best Zone " .. bestZone
                         actionLabel.TextColor3 = Color3.fromRGB(255, 200, 100)
                     end
                 end
@@ -359,33 +368,10 @@ task.spawn(function()
     end
 end)
 
--- Toggle Function
-toggleBtn.MouseButton1Click:Connect(function()
-    autoEnabled = not autoEnabled
-    if autoEnabled then
-        toggleBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 80)
-        toggleBtn.Text = "ON"
-        sideLamp.BackgroundColor3 = Color3.fromRGB(0, 255, 100)
-        statusText.Text = "✅ AUTO DETECT ON"
-        statusText.TextColor3 = Color3.fromRGB(100, 255, 100)
-        print("🟢 Auto Zone Detect: ON")
-        task.wait(2)
-        statusText.Text = "📡 Menunggu perubahan..."
-        statusText.TextColor3 = Color3.fromRGB(200, 200, 220)
-    else
-        toggleBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-        toggleBtn.Text = "OFF"
-        sideLamp.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
-        statusText.Text = "⏸️ AUTO DETECT OFF"
-        statusText.TextColor3 = Color3.fromRGB(255, 150, 150)
-        print("🔴 Auto Zone Detect: OFF")
-    end
-end)
-
--- Efek side lamp berkedip
+-- Efek side lamp
 task.spawn(function()
     while true do
-        if autoEnabled then
+        if autoUfoEnabled then
             for i = 0.5, 1, 0.1 do
                 sideLamp.BackgroundTransparency = i
                 task.wait(0.05)
@@ -402,11 +388,11 @@ task.spawn(function()
 end)
 
 print("═══════════════════════════════════════════")
-print("   AUTO ZONE DETECT - 1x TELEPORT")
+print("   AUTO UFO - DETECT UI + BEST ZONE")
 print("═══════════════════════════════════════════")
 print("📡 Membaca dari: PlayerGui.Root.UfoStatusRoot")
-print("🎯 Nama Zone → Teleport ke zone tersebut (1x)")
-print("❌ Bukan zone → Teleport ke Best Zone (1x)")
+print("🎯 Nama Zone → Teleport ke zone tersebut")
+print("❌ Bukan zone → Teleport ke Best Zone (Colin)")
 print("🖱️ GUI bisa di-drag dari title bar")
 print("🔘 Tombol ON/OFF")
 print("═══════════════════════════════════════════")
