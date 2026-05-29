@@ -22,9 +22,8 @@ local AutoCurrency = false
 local AutoRollSpeed = false
 
 -- ========== AUTO UFO (DEFAULT ON) ==========
-local AutoUfo = true          -- DEFAULT ON
-local UFO_INTERVAL = 10       -- Teleport ke UFO setiap 10 detik
-local alreadyInZone40 = false -- Flag untuk teleport Zone 40 hanya sekali
+local AutoUfo = true
+local UFO_INTERVAL = 10
 
 local function GetRemote(Name)
     local Success, Remote = pcall(function()
@@ -41,6 +40,11 @@ local RebirthSvc = GetRemote("RebirthService")
 local ZonesSvc = GetRemote("ZonesService")
 local UpgradeSvc = GetRemote("UpgradeService")
 local LootSvc = GetRemote("LootService")
+
+local function UseBoost(Type)
+    if not BoostSvc then return end
+    pcall(function() BoostSvc:InvokeServer("requestUseBoost", Type) end)
+end
 
 local function FindGameplay()
     for _, Child in ipairs(workspace:GetChildren()) do
@@ -156,18 +160,14 @@ local function Rebirth()
     pcall(function() RebirthSvc:InvokeServer("requestRebirth") end)
 end
 
-local function TeleportZone(ZoneNum)
-    if not ZonesSvc then return end
-    pcall(function() ZonesSvc:InvokeServer("requestTeleportZone", ZoneNum) end)
-end
-
+-- ========== FUNGSI GET BEST OPEN ZONE (COLIN) ==========
 local function GetBestOpenZone()
     local Best = 0
     local Zones = workspace:FindFirstChild("Zones")
     if Zones then
         for _, Zone in ipairs(Zones:GetChildren()) do
             local Num = tonumber(Zone.Name) or 0
-            if Num > 0 then
+            if Num > 0 and Num <= 40 then
                 local Gate = Zone:FindFirstChild("Gate")
                 local Blocker = Gate and Gate:FindFirstChild("ClientGateBlocker_"..Num)
                 if Blocker and not Blocker.CanCollide and Num > Best then
@@ -179,50 +179,63 @@ local function GetBestOpenZone()
     return Best
 end
 
+-- ========== TELEPORT KE PLAYERSPAWN ZONE ==========
+local function TeleportToPlayerSpawn(zoneNumber)
+    if zoneNumber > 40 then return false end
+    
+    local targetPart = workspace:FindFirstChild("Zones") 
+        and workspace.Zones:FindFirstChild(tostring(zoneNumber)) 
+        and workspace.Zones[tostring(zoneNumber)]:FindFirstChild("POI") 
+        and workspace.Zones[tostring(zoneNumber)].POI:FindFirstChild("PlayerSpawn")
+    
+    if not targetPart or not targetPart:IsA("BasePart") then
+        return false
+    end
+    
+    local char = LocalPlayer.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then
+        return false
+    end
+    
+    local hrp = char.HumanoidRootPart
+    hrp.CFrame = CFrame.new(targetPart.Position.X, targetPart.Position.Y + 3, targetPart.Position.Z)
+    return true
+end
+
+-- ========== AUTO BUY ZONE (MAX 40) ==========
 local function BuyZoneAndTeleport()
     if not ZonesSvc then return end
     
-    local ZoneBefore = GetBestOpenZone()
-    local TargetZone = ZoneBefore + 1
+    local colinSebelum = GetBestOpenZone()
     
+    if colinSebelum >= 40 then
+        print("🏆 SUDAH DI ZONE MAKSIMAL 40!")
+        return
+    end
+    
+    local targetZone = colinSebelum + 1
+    if targetZone > 40 then return end
+    
+    print("🛒 Membeli Zone " .. targetZone .. "...")
     local Success = pcall(function()
         ZonesSvc:InvokeServer("requestPurchaseZone")
     end)
     
     if Success then
-        task.wait(1)
+        print("✅ Berhasil membeli Zone " .. targetZone)
+        print("⏳ Tunggu 3 detik...")
+        task.wait(3)
         
-        local targetZoneFolder = workspace:FindFirstChild("Zones") and 
-                                 workspace.Zones:FindFirstChild(tostring(TargetZone))
-        
-        if targetZoneFolder then
-            local gate = targetZoneFolder:FindFirstChild("Gate")
-            if gate and gate:FindFirstChild("DepthFade") then
-                TeleportZone(TargetZone)
-            else
-                local BestZone = GetBestOpenZone()
-                if BestZone > 0 then
-                    TeleportZone(BestZone)
-                end
-            end
-        else
-            local BestZone = GetBestOpenZone()
-            if BestZone > 0 then
-                TeleportZone(BestZone)
-            end
+        local bestZone = GetBestOpenZone()
+        if bestZone > 0 and bestZone <= 40 then
+            print("📍 Teleport ke Best Zone: " .. bestZone)
+            TeleportToPlayerSpawn(bestZone)
         end
     end
 end
 
-local function UseBoost(Type)
-    if not BoostSvc then return end
-    pcall(function() BoostSvc:InvokeServer("requestUseBoost", Type) end)
-end
-
--- ========== AUTO UFO TELEPORT FUNCTIONS ==========
+-- ========== AUTO UFO TELEPORT ==========
 local function TeleportToUfo()
-    if not AutoUfo then return false end
-    
     local ufoRoot = workspace:FindFirstChild("UfoEvent") 
         and workspace.UfoEvent:FindFirstChild("UFO") 
         and workspace.UfoEvent.UFO:FindFirstChild("Root")
@@ -237,37 +250,18 @@ local function TeleportToUfo()
     end
     
     local hrp = char.HumanoidRootPart
-    local ufoPos = ufoRoot.Position
-    hrp.CFrame = CFrame.new(ufoPos.X, hrp.Position.Y, ufoPos.Z)
-    
+    hrp.CFrame = CFrame.new(ufoRoot.Position.X, hrp.Position.Y, ufoRoot.Position.Z)
     print("🛸 Teleport ke UFO!")
     return true
 end
 
-local function TeleportToZone40()
-    if not AutoUfo then return false end
+-- Teleport ke best zone (Colin)
+local function TeleportToBestZone()
+    local colin = GetBestOpenZone()
+    if colin <= 0 then return false end
     
-    local targetPart = workspace:FindFirstChild("Zones") 
-        and workspace.Zones:FindFirstChild("40") 
-        and workspace.Zones["40"]:FindFirstChild("POI") 
-        and workspace.Zones["40"].POI:FindFirstChild("PlayerSpawn")
-    
-    if not targetPart or not targetPart:IsA("BasePart") then
-        print("❌ Zone 40 Spawn tidak ditemukan")
-        return false
-    end
-    
-    local char = LocalPlayer.Character
-    if not char or not char:FindFirstChild("HumanoidRootPart") then
-        return false
-    end
-    
-    local hrp = char.HumanoidRootPart
-    local targetPos = targetPart.Position
-    hrp.CFrame = CFrame.new(targetPos.X, targetPos.Y + 3, targetPos.Z)
-    
-    print("📍 Teleport ke Zone 40 Spawn (SEKALI SAJA)")
-    return true
+    print("📍 Teleport ke Best Zone: " .. colin)
+    return TeleportToPlayerSpawn(colin)
 end
 
 -- ========== LOOP AUTO UFO ==========
@@ -276,24 +270,16 @@ task.spawn(function()
         task.wait(UFO_INTERVAL)
         
         if not AutoUfo then 
-            -- Reset flag kalau auto ufo dimatikan
-            alreadyInZone40 = false
-            print("🛸 Auto UFO: OFF")
             continue 
         end
         
         local ufoAda = TeleportToUfo()
         
-        if ufoAda then
-            -- UFO ada, reset flag zone40
-            alreadyInZone40 = false
-        else
-            -- UFO tidak ada
-            if not alreadyInZone40 then
-                TeleportToZone40()
-                alreadyInZone40 = true
-                print("⏸️ UFO tidak ada, sudah di Zone 40. Menunggu UFO spawn...")
-            end
+        if not ufoAda then
+            -- UFO tidak ada, tunggu 3 detik lalu teleport ke best zone
+            print("🛸 UFO tidak ditemukan, tunggu 3 detik...")
+            task.wait(3)
+            TeleportToBestZone()
         end
     end
 end)
@@ -374,8 +360,8 @@ GUI.ResetOnSpawn = false
 GUI.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
 local Main = Instance.new("Frame")
-Main.Size = UDim2.new(0, 240, 0, 420)
-Main.Position = UDim2.new(0.5, -120, 0.5, -210)
+Main.Size = UDim2.new(0, 300, 0, 380)
+Main.Position = UDim2.new(0.5, -150, 0.5, -190)
 Main.BackgroundColor3 = Color3.fromRGB(8, 6, 15)
 Main.BackgroundTransparency = 0.05
 Main.BorderSizePixel = 0
@@ -393,7 +379,7 @@ UIGradient.Rotation = 90
 UIGradient.Parent = Main
 
 local Corner = Instance.new("UICorner")
-Corner.CornerRadius = UDim.new(0, 6)
+Corner.CornerRadius = UDim.new(0, 8)
 Corner.Parent = Main
 
 local Stroke = Instance.new("UIStroke")
@@ -700,48 +686,47 @@ local function MakeSep(Parent)
     return Line
 end
 
--- ========== AUTO UFO TOGGLE (BESAR, WARNA BIRU, PALING ATAS) ==========
+-- ========== AUTO UFO TOGGLE (UKURAN SAMA DENGAN AUTO GUN) ==========
 local UfoFrame = Instance.new("Frame")
-UfoFrame.Size = UDim2.new(1, 0, 0, 38)
+UfoFrame.Size = UDim2.new(1, 0, 0, 32)
 UfoFrame.BackgroundColor3 = Color3.fromRGB(18, 16, 32)
 UfoFrame.BackgroundTransparency = 0.2
 UfoFrame.BorderSizePixel = 0
 UfoFrame.Parent = Scroll
 local UfoCorner = Instance.new("UICorner")
-UfoCorner.CornerRadius = UDim.new(0, 6)
+UfoCorner.CornerRadius = UDim.new(0, 5)
 UfoCorner.Parent = UfoFrame
 
 local UfoLabel = Instance.new("TextLabel")
-UfoLabel.Size = UDim2.new(1, -65, 1, 0)
-UfoLabel.Position = UDim2.new(0, 10, 0, 0)
+UfoLabel.Size = UDim2.new(1, -80, 1, 0)
+UfoLabel.Position = UDim2.new(0, 6, 0, 0)
 UfoLabel.BackgroundTransparency = 1
 UfoLabel.Text = "🛸 Auto UFO (10s)"
-UfoLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+UfoLabel.TextColor3 = Color3.fromRGB(200, 200, 230)
 UfoLabel.Font = Enum.Font.FredokaOne
-UfoLabel.TextSize = 12
+UfoLabel.TextSize = 11
 UfoLabel.TextXAlignment = Enum.TextXAlignment.Left
 UfoLabel.Parent = UfoFrame
 
 local UfoBtn = Instance.new("TextButton")
-UfoBtn.Size = UDim2.new(0, 60, 0, 28)
-UfoBtn.Position = UDim2.new(1, -70, 0.5, -14)
-UfoBtn.BackgroundColor3 = AutoUfo and Color3.fromRGB(0, 100, 255) or Color3.fromRGB(70, 70, 70)
+UfoBtn.Size = UDim2.new(0, 60, 0, 24)
+UfoBtn.Position = UDim2.new(1, -68, 0.5, -12)
+UfoBtn.BackgroundColor3 = AutoUfo and Color3.fromRGB(50, 150, 255) or Color3.fromRGB(70, 70, 70)
 UfoBtn.Text = AutoUfo and "ON" or "OFF"
 UfoBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 UfoBtn.Font = Enum.Font.FredokaOne
-UfoBtn.TextSize = 12
+UfoBtn.TextSize = 10
 UfoBtn.BorderSizePixel = 0
 UfoBtn.Parent = UfoFrame
 local UfoBtnCorner = Instance.new("UICorner")
-UfoBtnCorner.CornerRadius = UDim.new(0, 6)
+UfoBtnCorner.CornerRadius = UDim.new(0, 5)
 UfoBtnCorner.Parent = UfoBtn
 
 UfoBtn.MouseButton1Click:Connect(function()
     AutoUfo = not AutoUfo
     if AutoUfo then
-        UfoBtn.BackgroundColor3 = Color3.fromRGB(0, 100, 255)
+        UfoBtn.BackgroundColor3 = Color3.fromRGB(50, 150, 255)
         UfoBtn.Text = "ON"
-        alreadyInZone40 = false  -- Reset flag saat ON
         print("🛸 Auto UFO: ON")
     else
         UfoBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
@@ -794,12 +779,12 @@ Status.Parent = Scroll
 MinBtn.MouseButton1Click:Connect(function()
     isMinimized = not isMinimized
     if isMinimized then
-        Main.Size = UDim2.new(0, 240, 0, 35)
+        Main.Size = UDim2.new(0, 300, 0, 35)
         Scroll.Visible = false
         SideLamp.Visible = false
         MinBtn.Text = "+"
     else
-        Main.Size = UDim2.new(0, 240, 0, 420)
+        Main.Size = UDim2.new(0, 300, 0, 380)
         Scroll.Visible = true
         SideLamp.Visible = true
         MinBtn.Text = "−"
@@ -811,11 +796,12 @@ print("   ZAIXPLOIT | SLIME RNG + AUTO UFO")
 print("═══════════════════════════════════════════")
 print("✅ AUTO UFO (ON by default) - Teleport 10s")
 print("   → Ada UFO: Teleport ke UFO")
-print("   → Tidak ada: Teleport ke Zone 40 (SEKALI)")
+print("   → Tidak ada: Tunggu 3s → Teleport ke Best Zone")
+print("✅ AUTO BUY ZONE (MAX 40)")
+print("   → Beli zone, tunggu 3s, teleport ke Best Zone")
 print("✅ AUTO GUN | AUTO ROLL (OFF/NORMAL/FAST)")
 print("✅ AUTO INDEX | AUTO FARM LOOT | AUTO FARM FRUIT")
 print("✅ AUTO UPGRADE | AUTO REBIRTH")
-print("✅ AUTO BUY ZONE + TELEPORT")
 print("✅ AUTO POTION (4 BOOSTS)")
 print("🚀 SCRIPT SIAP DIGUNAKAN")
 print("═══════════════════════════════════════════")
