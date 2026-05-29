@@ -2,6 +2,7 @@ local RepStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local VirtualUser = game:GetService("VirtualUser")
+local TweenService = game:GetService("TweenService")
 
 local isMinimized = false
 
@@ -21,10 +22,14 @@ local AutoUltraLuck = false
 local AutoCurrency = false
 local AutoRollSpeed = false
 
--- ========== AUTO UFO (DEFAULT ON) ==========
+-- ========== AUTO UFO 2 MODE ==========
 local AutoUfo = true
-local UFO_INTERVAL = 28
-local lastTeleportToZone = false
+local AutoUfoMode = 2  -- 1 = TELEPORT (33s), 2 = FOLLOW (nempel terus)
+local TELEPORT_INTERVAL = 33
+local FOLLOW_SPEED = 0.15  -- Kecepatan follow (semakin kecil semakin cepat nempel)
+
+local isFollowing = false
+local followConnection = nil
 
 local function GetRemote(Name)
     local Success, Remote = pcall(function()
@@ -235,7 +240,8 @@ local function BuyZoneAndTeleport()
     end
 end
 
--- ========== AUTO UFO TELEPORT ==========
+-- ========== AUTO UFO FUNCTIONS ==========
+-- Teleport ke UFO (Mode 1)
 local function TeleportToUfo()
     local ufoRoot = workspace:FindFirstChild("UfoEvent") 
         and workspace.UfoEvent:FindFirstChild("UFO") 
@@ -252,40 +258,72 @@ local function TeleportToUfo()
     
     local hrp = char.HumanoidRootPart
     hrp.CFrame = CFrame.new(ufoRoot.Position.X, hrp.Position.Y, ufoRoot.Position.Z)
-    print("🛸 Teleport ke UFO!")
+    print("⚡ MODE TELEPORT - Langsung ke UFO!")
     return true
 end
 
--- ========== LOOP AUTO UFO ==========
-task.spawn(function()
-    while true do
-        task.wait(UFO_INTERVAL)
-        
-        if not AutoUfo then 
-            continue 
+-- Start Follow Mode (Mode 2 - nempel terus)
+local function StartFollowMode()
+    if isFollowing then return end
+    isFollowing = true
+    
+    print("🌀 MODE FOLLOW AKTIF - Akan nempel terus ke UFO")
+    
+    followConnection = RunService.RenderStepped:Connect(function()
+        if not AutoUfo or AutoUfoMode ~= 2 then 
+            if followConnection then followConnection:Disconnect() end
+            isFollowing = false
+            return 
         end
         
-        local ufoAda = TeleportToUfo()
+        local ufoRoot = workspace:FindFirstChild("UfoEvent") 
+            and workspace.UfoEvent:FindFirstChild("UFO") 
+            and workspace.UfoEvent.UFO:FindFirstChild("Root")
         
-        if ufoAda then
-            lastTeleportToZone = false
-        else
-            if not lastTeleportToZone then
-                print("🛸 UFO tidak ditemukan, tunggu 3 detik...")
-                task.wait(3)
-                
-                local colin = GetBestOpenZone()
-                local targetZone = colin + 1
-                
-                if targetZone <= 40 then
-                    print("📍 Colin: " .. colin .. " → Teleport ke Zone " .. targetZone)
-                    TeleportToPlayerSpawn(targetZone)
-                    lastTeleportToZone = true
-                else
-                    print("🏆 Sudah di zone maksimal 40!")
-                end
+        if ufoRoot and ufoRoot:IsA("BasePart") then
+            local char = LocalPlayer.Character
+            if char and char:FindFirstChild("HumanoidRootPart") then
+                local hrp = char.HumanoidRootPart
+                local targetPos = Vector3.new(ufoRoot.Position.X, hrp.Position.Y, ufoRoot.Position.Z)
+                local newPos = hrp.Position:Lerp(targetPos, FOLLOW_SPEED)
+                hrp.CFrame = CFrame.new(newPos)
             end
         end
+    end)
+end
+
+local function StopFollowMode()
+    if followConnection then
+        followConnection:Disconnect()
+        followConnection = nil
+    end
+    isFollowing = false
+    print("⏸️ MODE FOLLOW BERHENTI")
+end
+
+-- Loop untuk Mode Teleport
+task.spawn(function()
+    while true do
+        task.wait(TELEPORT_INTERVAL)
+        if AutoUfo and AutoUfoMode == 1 then
+            TeleportToUfo()
+        end
+    end
+end)
+
+-- Monitor mode change
+task.spawn(function()
+    while true do
+        if AutoUfo and AutoUfoMode == 2 then
+            if not isFollowing then
+                StartFollowMode()
+            end
+        else
+            if isFollowing then
+                StopFollowMode()
+            end
+        end
+        task.wait(1)
     end
 end)
 
@@ -365,8 +403,8 @@ GUI.ResetOnSpawn = false
 GUI.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
 local Main = Instance.new("Frame")
-Main.Size = UDim2.new(0, 300, 0, 420)
-Main.Position = UDim2.new(0.5, -150, 0.5, -210)
+Main.Size = UDim2.new(0, 300, 0, 460)
+Main.Position = UDim2.new(0.5, -150, 0.5, -230)
 Main.BackgroundColor3 = Color3.fromRGB(8, 6, 15)
 Main.BackgroundTransparency = 0.05
 Main.BorderSizePixel = 0
@@ -555,7 +593,7 @@ Padding.PaddingTop = UDim.new(0, 6)
 Padding.PaddingBottom = UDim.new(0, 6)
 Padding.Parent = Scroll
 
--- ========== STATUS UFO (DI ATAS AUTO UFO) ==========
+-- ========== STATUS UFO ==========
 local UfoStatusFrame = Instance.new("Frame")
 UfoStatusFrame.Size = UDim2.new(1, 0, 0, 28)
 UfoStatusFrame.BackgroundColor3 = Color3.fromRGB(18, 16, 32)
@@ -586,7 +624,7 @@ UfoStatusText.TextXAlignment = Enum.TextXAlignment.Left
 UfoStatusText.Font = Enum.Font.FredokaOne
 UfoStatusText.Parent = UfoStatusFrame
 
--- Update status UFO setiap detik
+-- Update status UFO
 task.spawn(function()
     while true do
         local ufoRoot = workspace:FindFirstChild("UfoEvent") 
@@ -595,7 +633,11 @@ task.spawn(function()
         
         if ufoRoot and ufoRoot:IsA("BasePart") then
             UfoStatusIcon.Text = "🛸"
-            UfoStatusText.Text = "UFO SEDANG AKTIF!"
+            if AutoUfoMode == 2 and AutoUfo then
+                UfoStatusText.Text = "UFO AKTIF - FOLLOW MODE"
+            else
+                UfoStatusText.Text = "UFO SEDANG AKTIF!"
+            end
             UfoStatusText.TextColor3 = Color3.fromRGB(100, 255, 100)
         else
             UfoStatusIcon.Text = "❌"
@@ -606,7 +648,7 @@ task.spawn(function()
     end
 end)
 
--- ========== AUTO UFO TOGGLE (UKURAN SAMA DENGAN AUTO GUN) ==========
+-- ========== AUTO UFO TOGGLE (ON/OFF) ==========
 local UfoFrame = Instance.new("Frame")
 UfoFrame.Size = UDim2.new(1, 0, 0, 32)
 UfoFrame.BackgroundColor3 = Color3.fromRGB(18, 16, 32)
@@ -621,7 +663,7 @@ local UfoLabel = Instance.new("TextLabel")
 UfoLabel.Size = UDim2.new(1, -80, 1, 0)
 UfoLabel.Position = UDim2.new(0, 6, 0, 0)
 UfoLabel.BackgroundTransparency = 1
-UfoLabel.Text = "🛸 Auto UFO (28s)"
+UfoLabel.Text = "🛸 Auto UFO"
 UfoLabel.TextColor3 = Color3.fromRGB(200, 200, 230)
 UfoLabel.Font = Enum.Font.FredokaOne
 UfoLabel.TextSize = 11
@@ -648,11 +690,87 @@ UfoBtn.MouseButton1Click:Connect(function()
         UfoBtn.BackgroundColor3 = Color3.fromRGB(50, 150, 255)
         UfoBtn.Text = "ON"
         print("🛸 Auto UFO: ON")
+        if AutoUfoMode == 2 then
+            StartFollowMode()
+        end
     else
         UfoBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
         UfoBtn.Text = "OFF"
+        StopFollowMode()
         print("🛸 Auto UFO: OFF")
     end
+end)
+
+-- ========== MODE SELECTOR (TELEPORT / FOLLOW) ==========
+local ModeFrame = Instance.new("Frame")
+ModeFrame.Size = UDim2.new(1, 0, 0, 32)
+ModeFrame.BackgroundColor3 = Color3.fromRGB(18, 16, 32)
+ModeFrame.BackgroundTransparency = 0.2
+ModeFrame.BorderSizePixel = 0
+ModeFrame.Parent = Scroll
+local ModeCorner = Instance.new("UICorner")
+ModeCorner.CornerRadius = UDim.new(0, 5)
+ModeCorner.Parent = ModeFrame
+
+local ModeLabel = Instance.new("TextLabel")
+ModeLabel.Size = UDim2.new(0.4, 0, 1, 0)
+ModeLabel.Position = UDim2.new(0, 6, 0, 0)
+ModeLabel.BackgroundTransparency = 1
+ModeLabel.Text = "🎮 Mode"
+ModeLabel.TextColor3 = Color3.fromRGB(200, 200, 230)
+ModeLabel.Font = Enum.Font.FredokaOne
+ModeLabel.TextSize = 11
+ModeLabel.TextXAlignment = Enum.TextXAlignment.Left
+ModeLabel.Parent = ModeFrame
+
+local TeleportBtn = Instance.new("TextButton")
+TeleportBtn.Size = UDim2.new(0, 70, 0, 22)
+TeleportBtn.Position = UDim2.new(0.45, 0, 0.5, -11)
+TeleportBtn.BackgroundColor3 = AutoUfoMode == 1 and Color3.fromRGB(50, 150, 255) or Color3.fromRGB(70, 70, 70)
+TeleportBtn.Text = "⚡ TELEPORT"
+TeleportBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+TeleportBtn.Font = Enum.Font.FredokaOne
+TeleportBtn.TextSize = 9
+TeleportBtn.BorderSizePixel = 0
+TeleportBtn.Parent = ModeFrame
+local TeleportCorner = Instance.new("UICorner")
+TeleportCorner.CornerRadius = UDim.new(0, 5)
+TeleportCorner.Parent = TeleportBtn
+
+local FollowBtn = Instance.new("TextButton")
+FollowBtn.Size = UDim2.new(0, 60, 0, 22)
+FollowBtn.Position = UDim2.new(0.73, 0, 0.5, -11)
+FollowBtn.BackgroundColor3 = AutoUfoMode == 2 and Color3.fromRGB(50, 150, 255) or Color3.fromRGB(70, 70, 70)
+FollowBtn.Text = "🌀 FOLLOW"
+FollowBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+FollowBtn.Font = Enum.Font.FredokaOne
+FollowBtn.TextSize = 9
+FollowBtn.BorderSizePixel = 0
+FollowBtn.Parent = ModeFrame
+local FollowCorner = Instance.new("UICorner")
+FollowCorner.CornerRadius = UDim.new(0, 5)
+FollowCorner.Parent = FollowBtn
+
+TeleportBtn.MouseButton1Click:Connect(function()
+    AutoUfoMode = 1
+    TeleportBtn.BackgroundColor3 = Color3.fromRGB(50, 150, 255)
+    FollowBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+    StopFollowMode()
+    print("⚡ Mode TELEPORT (setiap 33 detik)")
+    if AutoUfo then
+        print("   Akan teleport ke UFO setiap 33 detik")
+    end
+end)
+
+FollowBtn.MouseButton1Click:Connect(function()
+    AutoUfoMode = 2
+    FollowBtn.BackgroundColor3 = Color3.fromRGB(50, 150, 255)
+    TeleportBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+    if AutoUfo then
+        StartFollowMode()
+    end
+    print("🌀 Mode FOLLOW (nempel terus ke UFO)")
+    print("   Karakter akan selalu mengikuti posisi UFO")
 end)
 
 -- ========== GUI COMPONENTS ==========
@@ -840,7 +958,7 @@ MinBtn.MouseButton1Click:Connect(function()
         SideLamp.Visible = false
         MinBtn.Text = "+"
     else
-        Main.Size = UDim2.new(0, 300, 0, 420)
+        Main.Size = UDim2.new(0, 300, 0, 460)
         Scroll.Visible = true
         SideLamp.Visible = true
         MinBtn.Text = "−"
@@ -848,11 +966,11 @@ MinBtn.MouseButton1Click:Connect(function()
 end)
 
 print("═══════════════════════════════════════════")
-print("   ZAIXPLOIT | SLIME RNG + AUTO UFO")
+print("   ZAIXPLOIT | SLIME RNG + AUTO UFO 2 MODE")
 print("═══════════════════════════════════════════")
-print("✅ AUTO UFO (ON by default) - Teleport 28s")
-print("   → Ada UFO: Teleport ke UFO setiap 28 detik")
-print("   → Tidak ada: Tunggu 3s → Teleport ke Colin+1")
+print("✅ AUTO UFO (ON by default)")
+print("   → Mode 1 (TELEPORT): Teleport setiap 33 detik")
+print("   → Mode 2 (FOLLOW): Nempel terus ke UFO")
 print("✅ AUTO BUY ZONE (MAX 40)")
 print("   → Beli zone, tunggu 3s, teleport ke Best Zone")
 print("✅ AUTO GUN | AUTO ROLL (OFF/NORMAL/FAST)")
@@ -861,3 +979,8 @@ print("✅ AUTO UPGRADE | AUTO REBIRTH")
 print("✅ AUTO POTION (4 BOOSTS)")
 print("🚀 SCRIPT SIAP DIGUNAKAN")
 print("═══════════════════════════════════════════")
+
+-- Start follow mode if default mode is 2
+if AutoUfo and AutoUfoMode == 2 then
+    StartFollowMode()
+end
