@@ -1,12 +1,10 @@
 -- ========== AUTO ZONE DETECT - 1x TELEPORT PER PERUBAHAN ==========
 local Players = game:GetService("Players")
 local player = Players.LocalPlayer
-local UserInputService = game:GetService("UserInputService")
-local tweenService = game:GetService("TweenService")
 
 -- ========== KONFIGURASI ==========
 local autoEnabled = true
-local lastText = nil
+local lastText = nil  -- PENTING! UNTUK CEK PERUBAHAN
 local isProcessing = false
 
 -- ========== DATA NAMA ZONE (1-40) ==========
@@ -97,7 +95,7 @@ local function detectZoneFromText(text)
     return nil, nil
 end
 
--- ========== FUNGSI BEST ZONE (COLIN) ==========
+-- ========== FUNGSI BEST ZONE ==========
 local function GetBestOpenZone()
     local Best = 0
     local Zones = workspace:FindFirstChild("Zones")
@@ -143,22 +141,25 @@ local function teleportToZone(zoneNum, zoneName)
     return true
 end
 
--- ========== PROSES TEKS (1x LANGSUNG) ==========
+-- ========== PROSES TEKS (HANYA 1x SAAT BERUBAH) ==========
 local function processText(currentText)
     if isProcessing then return end
-    if currentText == lastText then return end
+    if currentText == lastText then 
+        -- TEKS SAMA, SKIP
+        return 
+    end
     
     isProcessing = true
     
     local zoneNum, zoneName = detectZoneFromText(currentText)
     
     if zoneNum then
-        -- ZONE TERDETEKSI → TELEPORT KE ZONE TERSEBUT
-        print("🎯 " .. currentText .. " → Teleport ke " .. zoneName)
+        -- ZONE TERDETEKSI
+        print("🎯 [BERUBAH] " .. currentText .. " → Teleport ke " .. zoneName)
         teleportToZone(zoneNum, zoneName)
     else
-        -- ZONE TIDAK TERDETEKSI → TELEPORT KE BEST ZONE (Colin + 1)
-        print("❌ " .. currentText .. " → Teleport ke Best Zone")
+        -- ZONE TIDAK TERDETEKSI → BEST ZONE
+        print("❌ [BERUBAH] " .. currentText .. " → Teleport ke Best Zone")
         local bestZone = GetBestOpenZone()
         local targetZone = bestZone + 1
         if targetZone <= 40 then
@@ -169,7 +170,7 @@ local function processText(currentText)
         end
     end
     
-    lastText = currentText
+    lastText = currentText  -- SIMPAN TEKS YANG SUDAH DIPROSES
     isProcessing = false
 end
 
@@ -179,14 +180,14 @@ task.spawn(function()
         if autoEnabled then
             local currentText = getUIText()
             if currentText then
-                processText(currentText)
+                processText(currentText)  -- HANYA PROSES JIKA BERUBAH
             end
         end
         task.wait(0.5)
     end
 end)
 
--- ========== GUI DRAG ==========
+-- ========== GUI ==========
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "AutoZoneDetect"
 screenGui.ResetOnSpawn = false
@@ -404,8 +405,8 @@ print("════════════════════════�
 print("   AUTO ZONE DETECT - 1x TELEPORT")
 print("═══════════════════════════════════════════")
 print("📡 Membaca dari: PlayerGui.Root.UfoStatusRoot")
-print("🎯 Nama Zone → Teleport ke zone tersebut")
-print("❌ Bukan zone → Teleport ke Best Zone (Colin+1)")
+print("🎯 Nama Zone → Teleport ke zone tersebut (1x)")
+print("❌ Bukan zone → Teleport ke Best Zone (1x)")
 print("🖱️ GUI bisa di-drag dari title bar")
 print("🔘 Tombol ON/OFF")
 print("═══════════════════════════════════════════")
