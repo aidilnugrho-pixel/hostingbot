@@ -21,6 +21,9 @@ local AutoUltraLuck = false
 local AutoCurrency = false
 local AutoRollSpeed = false
 
+-- ========== AUTO UFO (DEFAULT ON) ==========
+local AutoUfo = true  -- Langsung ON saat execute
+
 local function GetRemote(Name)
     local Success, Remote = pcall(function()
         return RepStorage:WaitForChild("Packages"):WaitForChild("_Index"):WaitForChild("leifstout_networker@0.3.1"):WaitForChild("networker"):WaitForChild("_remotes"):WaitForChild(Name):WaitForChild("RemoteFunction")
@@ -214,6 +217,40 @@ local function UseBoost(Type)
     pcall(function() BoostSvc:InvokeServer("requestUseBoost", Type) end)
 end
 
+-- ========== AUTO UFO TELEPORT FUNCTION ==========
+local function TeleportToUfo()
+    if not AutoUfo then return false end
+    
+    local ufoRoot = workspace:FindFirstChild("UfoEvent") 
+        and workspace.UfoEvent:FindFirstChild("UFO") 
+        and workspace.UfoEvent.UFO:FindFirstChild("Root")
+    
+    if not ufoRoot or not ufoRoot:IsA("BasePart") then
+        return false
+    end
+    
+    local char = LocalPlayer.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then
+        return false
+    end
+    
+    local hrp = char.HumanoidRootPart
+    local ufoPos = ufoRoot.Position
+    hrp.CFrame = CFrame.new(ufoPos.X, hrp.Position.Y, ufoPos.Z)
+    return true
+end
+
+-- Loop Auto UFO (teleport setiap 15 detik)
+task.spawn(function()
+    while true do
+        if AutoUfo then
+            TeleportToUfo()
+        end
+        task.wait(15)
+    end
+end)
+
+-- ========== EXISTING LOOPS ==========
 task.spawn(function()
     while true do
         if AutoGunMode > 0 then
@@ -282,14 +319,15 @@ end
 DeleteAutoRejoin()
 task.spawn(function() while true do task.wait(10) DeleteAutoRejoin() end end)
 
+-- ========== GUI ==========
 local GUI = Instance.new("ScreenGui")
 GUI.Name = "ZAIXPLOIT"
 GUI.ResetOnSpawn = false
 GUI.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
 local Main = Instance.new("Frame")
-Main.Size = UDim2.new(0, 240, 0, 320)
-Main.Position = UDim2.new(0.5, -120, 0.5, -160)
+Main.Size = UDim2.new(0, 240, 0, 380)
+Main.Position = UDim2.new(0.5, -120, 0.5, -190)
 Main.BackgroundColor3 = Color3.fromRGB(8, 6, 15)
 Main.BackgroundTransparency = 0.05
 Main.BorderSizePixel = 0
@@ -478,6 +516,7 @@ Padding.PaddingTop = UDim.new(0, 6)
 Padding.PaddingBottom = UDim.new(0, 6)
 Padding.Parent = Scroll
 
+-- ========== GUI COMPONENTS ==========
 local function MakeModeToggle(Parent, Text, Emoji, GetMode, SetMode)
     local Frame = Instance.new("Frame")
     Frame.Size = UDim2.new(1, 0, 0, 28)
@@ -613,6 +652,56 @@ local function MakeSep(Parent)
     return Line
 end
 
+-- ========== AUTO UFO TOGGLE (PALING ATAS, DEFAULT ON) ==========
+local UfoFrame = Instance.new("Frame")
+UfoFrame.Size = UDim2.new(1, 0, 0, 28)
+UfoFrame.BackgroundColor3 = Color3.fromRGB(18, 16, 32)
+UfoFrame.BackgroundTransparency = 0.2
+UfoFrame.BorderSizePixel = 0
+UfoFrame.Parent = Scroll
+local UfoCorner = Instance.new("UICorner")
+UfoCorner.CornerRadius = UDim.new(0, 5)
+UfoCorner.Parent = UfoFrame
+
+local UfoLabel = Instance.new("TextLabel")
+UfoLabel.Size = UDim2.new(1, -55, 1, 0)
+UfoLabel.Position = UDim2.new(0, 6, 0, 0)
+UfoLabel.BackgroundTransparency = 1
+UfoLabel.Text = "🛸 Auto UFO"
+UfoLabel.TextColor3 = Color3.fromRGB(200, 200, 230)
+UfoLabel.Font = Enum.Font.FredokaOne
+UfoLabel.TextSize = 9
+UfoLabel.TextXAlignment = Enum.TextXAlignment.Left
+UfoLabel.Parent = UfoFrame
+
+local UfoBtn = Instance.new("TextButton")
+UfoBtn.Size = UDim2.new(0, 40, 0, 18)
+UfoBtn.Position = UDim2.new(1, -46, 0.5, -9)
+UfoBtn.BackgroundColor3 = AutoUfo and Color3.fromRGB(0, 180, 0) or Color3.fromRGB(70, 70, 70)
+UfoBtn.Text = AutoUfo and "ON" or "OFF"
+UfoBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+UfoBtn.Font = Enum.Font.FredokaOne
+UfoBtn.TextSize = 8
+UfoBtn.BorderSizePixel = 0
+UfoBtn.Parent = UfoFrame
+local UfoBtnCorner = Instance.new("UICorner")
+UfoBtnCorner.CornerRadius = UDim.new(0, 4)
+UfoBtnCorner.Parent = UfoBtn
+
+UfoBtn.MouseButton1Click:Connect(function()
+    AutoUfo = not AutoUfo
+    if AutoUfo then
+        UfoBtn.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
+        UfoBtn.Text = "ON"
+        print("🛸 Auto UFO: ON")
+    else
+        UfoBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+        UfoBtn.Text = "OFF"
+        print("🛸 Auto UFO: OFF")
+    end
+end)
+
+-- ========== EXISTING GUI ELEMENTS ==========
 MakeModeToggle(Scroll, "Auto Gun", "🔫", function() return AutoGunMode end, function(v)
     AutoGunMode = v
     if v == 1 then GunDelay = 0.1
@@ -661,7 +750,7 @@ MinBtn.MouseButton1Click:Connect(function()
         SideLamp.Visible = false
         MinBtn.Text = "+"
     else
-        Main.Size = UDim2.new(0, 240, 0, 320)
+        Main.Size = UDim2.new(0, 240, 0, 380)
         Scroll.Visible = true
         SideLamp.Visible = true
         MinBtn.Text = "−"
@@ -669,8 +758,9 @@ MinBtn.MouseButton1Click:Connect(function()
 end)
 
 print("═══════════════════════════════════════════")
-print("   ZAIXPLOIT | SLIME RNG - FINAL")
+print("   ZAIXPLOIT | SLIME RNG + AUTO UFO")
 print("═══════════════════════════════════════════")
+print("✅ AUTO UFO (ON by default) - Teleport 15s")
 print("✅ AUTO GUN | AUTO ROLL (OFF/NORMAL/FAST)")
 print("✅ AUTO INDEX | AUTO FARM LOOT | AUTO FARM FRUIT")
 print("✅ AUTO UPGRADE | AUTO REBIRTH")
