@@ -3,6 +3,7 @@ local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local VirtualUser = game:GetService("VirtualUser")
 local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
 
 local isMinimized = false
 
@@ -22,14 +23,54 @@ local AutoUltraLuck = false
 local AutoCurrency = false
 local AutoRollSpeed = false
 
--- ========== AUTO UFO 2 MODE ==========
-local AutoUfo = true
-local AutoUfoMode = 2  -- 1 = TELEPORT (33s), 2 = FOLLOW (nempel terus)
-local TELEPORT_INTERVAL = 33
-local FOLLOW_SPEED = 0.15  -- Kecepatan follow (semakin kecil semakin cepat nempel)
+-- ========== AUTO UFO BARU (DETECT UI + EXACT ZONE + BEST ZONE) ==========
+local autoUfoEnabled = true
+local lastUIText = nil
+local isProcessing = false
 
-local isFollowing = false
-local followConnection = nil
+-- ========== DATA NAMA ZONE (1-40) ==========
+local zoneList = {
+    { num = 1, name = "Grasslands", patterns = {"grasslands"} },
+    { num = 2, name = "Desert", patterns = {"desert"} },
+    { num = 3, name = "Polar", patterns = {"polar"} },
+    { num = 4, name = "Volcano", patterns = {"volcano"} },
+    { num = 5, name = "Islands", patterns = {"islands"} },
+    { num = 6, name = "Cave", patterns = {"cave"} },
+    { num = 7, name = "Heaven", patterns = {"heaven"} },
+    { num = 8, name = "Jungle", patterns = {"jungle"} },
+    { num = 9, name = "Canyon", patterns = {"canyon"} },
+    { num = 10, name = "Mushroom Forest", patterns = {"mushroom forest"} },
+    { num = 11, name = "Mushroom Soup", patterns = {"mushroom soup"} },
+    { num = 12, name = "Redwood Forest", patterns = {"redwood forest"} },
+    { num = 13, name = "Meteor", patterns = {"meteor"} },
+    { num = 14, name = "Candyland", patterns = {"candyland"} },
+    { num = 15, name = "Cherry Grove", patterns = {"cherry grove"} },
+    { num = 16, name = "Crystal Cavern", patterns = {"crystal cavern"} },
+    { num = 17, name = "Pumpkin Patch", patterns = {"pumpkin patch"} },
+    { num = 18, name = "Atlantis", patterns = {"atlantis"} },
+    { num = 19, name = "River", patterns = {"river"} },
+    { num = 20, name = "Pyramids", patterns = {"pyramids"} },
+    { num = 21, name = "Graveyard", patterns = {"graveyard"} },
+    { num = 22, name = "Hot Springs", patterns = {"hot springs"} },
+    { num = 23, name = "Tribe", patterns = {"tribe"} },
+    { num = 24, name = "Toxic Wasteland", patterns = {"toxic wasteland"} },
+    { num = 25, name = "Steampunk", patterns = {"steampunk"} },
+    { num = 26, name = "Winter Wonderland", patterns = {"winter wonderland"} },
+    { num = 27, name = "Farm", patterns = {"farm"} },
+    { num = 28, name = "Jungle Temple", patterns = {"jungle temple"} },
+    { num = 29, name = "Underworld", patterns = {"underworld"} },
+    { num = 30, name = "Swamp", patterns = {"swamp"} },
+    { num = 31, name = "Mushroom Village", patterns = {"mushroom village"} },
+    { num = 32, name = "The Void", patterns = {"the void"} },
+    { num = 33, name = "Honeycomb", patterns = {"honeycomb"} },
+    { num = 34, name = "Glow Mine", patterns = {"glow mine"} },
+    { num = 35, name = "Alien Planet", patterns = {"alien planet"} },
+    { num = 36, name = "Spooky House", patterns = {"spooky house"} },
+    { num = 37, name = "Skull Island", patterns = {"skull island"} },
+    { num = 38, name = "Slime Inc.", patterns = {"slime inc"} },
+    { num = 39, name = "Ancient Portal", patterns = {"ancient portal"} },
+    { num = 40, name = "Racetrack", patterns = {"racetrack"} }
+}
 
 local function GetRemote(Name)
     local Success, Remote = pcall(function()
@@ -185,16 +226,19 @@ local function GetBestOpenZone()
     return Best
 end
 
--- ========== TELEPORT KE PLAYERSPAWN ZONE ==========
-local function TeleportToPlayerSpawn(zoneNumber)
-    if zoneNumber > 40 then return false end
-    
+-- ========== TELEPORT KE ZONE ==========
+local function TeleportToZone(zoneNum, zoneName)
     local targetPart = workspace:FindFirstChild("Zones") 
-        and workspace.Zones:FindFirstChild(tostring(zoneNumber)) 
-        and workspace.Zones[tostring(zoneNumber)]:FindFirstChild("POI") 
-        and workspace.Zones[tostring(zoneNumber)].POI:FindFirstChild("PlayerSpawn")
+        and workspace.Zones:FindFirstChild(tostring(zoneNum)) 
+        and workspace.Zones[tostring(zoneNum)]:FindFirstChild("POI") 
+        and workspace.Zones[tostring(zoneNum)].POI:FindFirstChild("PlayerSpawn")
+    
+    if not targetPart then
+        targetPart = workspace:FindFirstChild("Zones") and workspace.Zones:FindFirstChild(tostring(zoneNum))
+    end
     
     if not targetPart or not targetPart:IsA("BasePart") then
+        print("❌ Zone " .. zoneNum .. " (" .. zoneName .. ") tidak ditemukan")
         return false
     end
     
@@ -205,10 +249,11 @@ local function TeleportToPlayerSpawn(zoneNumber)
     
     local hrp = char.HumanoidRootPart
     hrp.CFrame = CFrame.new(targetPart.Position.X, targetPart.Position.Y + 3, targetPart.Position.Z)
+    print("✅ Teleport ke " .. zoneName)
     return true
 end
 
--- ========== AUTO BUY ZONE (MAX 40) ==========
+-- ========== AUTO BUY ZONE ==========
 local function BuyZoneAndTeleport()
     if not ZonesSvc then return end
     
@@ -235,95 +280,110 @@ local function BuyZoneAndTeleport()
         local bestZone = GetBestOpenZone()
         if bestZone > 0 and bestZone <= 40 then
             print("📍 Teleport ke Best Zone: " .. bestZone)
-            TeleportToPlayerSpawn(bestZone)
+            TeleportToZone(bestZone, "Best Zone " .. bestZone)
         end
     end
 end
 
--- ========== AUTO UFO FUNCTIONS ==========
--- Teleport ke UFO (Mode 1)
-local function TeleportToUfo()
-    local ufoRoot = workspace:FindFirstChild("UfoEvent") 
-        and workspace.UfoEvent:FindFirstChild("UFO") 
-        and workspace.UfoEvent.UFO:FindFirstChild("Root")
+-- ========== BACA UI ==========
+local function getUIText()
+    local ufoUI = LocalPlayer.PlayerGui:FindFirstChild("Root") 
+        and LocalPlayer.PlayerGui.Root:FindFirstChild("UfoStatusRoot")
     
-    if not ufoRoot or not ufoRoot:IsA("BasePart") then
-        return false
+    if not ufoUI then
+        ufoUI = LocalPlayer.PlayerGui:FindFirstChild("UfoStatusRoot")
     end
     
-    local char = LocalPlayer.Character
-    if not char or not char:FindFirstChild("HumanoidRootPart") then
-        return false
+    if not ufoUI then
+        return nil
     end
     
-    local hrp = char.HumanoidRootPart
-    hrp.CFrame = CFrame.new(ufoRoot.Position.X, hrp.Position.Y, ufoRoot.Position.Z)
-    print("⚡ MODE TELEPORT - Langsung ke UFO!")
-    return true
+    local function findText(obj)
+        for _, child in pairs(obj:GetChildren()) do
+            if child:IsA("TextLabel") or child:IsA("TextButton") then
+                if child.Text and child.Text ~= "" then
+                    return child.Text
+                end
+            end
+            local found = findText(child)
+            if found then return found end
+        end
+        return nil
+    end
+    
+    return findText(ufoUI)
 end
 
--- Start Follow Mode (Mode 2 - nempel terus)
-local function StartFollowMode()
-    if isFollowing then return end
-    isFollowing = true
+-- ========== DETECT ZONE (EXACT MATCH) ==========
+local function detectZoneFromText(text)
+    if not text then return nil, nil end
+    local lowerText = string.lower(text)
     
-    print("🌀 MODE FOLLOW AKTIF - Akan nempel terus ke UFO")
-    
-    followConnection = RunService.RenderStepped:Connect(function()
-        if not AutoUfo or AutoUfoMode ~= 2 then 
-            if followConnection then followConnection:Disconnect() end
-            isFollowing = false
-            return 
+    for _, zone in pairs(zoneList) do
+        if lowerText == string.lower(zone.name) then
+            return zone.num, zone.name
         end
-        
-        local ufoRoot = workspace:FindFirstChild("UfoEvent") 
-            and workspace.UfoEvent:FindFirstChild("UFO") 
-            and workspace.UfoEvent.UFO:FindFirstChild("Root")
-        
-        if ufoRoot and ufoRoot:IsA("BasePart") then
-            local char = LocalPlayer.Character
-            if char and char:FindFirstChild("HumanoidRootPart") then
-                local hrp = char.HumanoidRootPart
-                local targetPos = Vector3.new(ufoRoot.Position.X, hrp.Position.Y, ufoRoot.Position.Z)
-                local newPos = hrp.Position:Lerp(targetPos, FOLLOW_SPEED)
-                hrp.CFrame = CFrame.new(newPos)
+    end
+    
+    for _, zone in pairs(zoneList) do
+        for _, pattern in pairs(zone.patterns) do
+            if string.find(lowerText, pattern) then
+                return zone.num, zone.name
             end
         end
-    end)
+    end
+    
+    return nil, nil
 end
 
-local function StopFollowMode()
-    if followConnection then
-        followConnection:Disconnect()
-        followConnection = nil
-    end
-    isFollowing = false
-    print("⏸️ MODE FOLLOW BERHENTI")
+-- ========== CEK TIMER 56.00 ==========
+local function isTargetTimer(text)
+    if not text then return false end
+    return text == "56.00" or text == "56:00"
 end
 
--- Loop untuk Mode Teleport
-task.spawn(function()
-    while true do
-        task.wait(TELEPORT_INTERVAL)
-        if AutoUfo and AutoUfoMode == 1 then
-            TeleportToUfo()
-        end
-    end
-end)
-
--- Monitor mode change
-task.spawn(function()
-    while true do
-        if AutoUfo and AutoUfoMode == 2 then
-            if not isFollowing then
-                StartFollowMode()
-            end
+-- ========== PROSES TEKS ==========
+local function processText(currentText)
+    if isProcessing then return end
+    if currentText == lastUIText then return end
+    
+    local zoneNum, zoneName = detectZoneFromText(currentText)
+    
+    if zoneNum then
+        isProcessing = true
+        print("🎯 " .. currentText .. " → Teleport ke " .. zoneName)
+        TeleportToZone(zoneNum, zoneName)
+        lastUIText = currentText
+        isProcessing = false
+    elseif isTargetTimer(currentText) then
+        local colin = GetBestOpenZone()
+        local targetZone = colin + 1
+        if targetZone <= 40 then
+            isProcessing = true
+            print("📍 " .. currentText .. " → Timer 56.00! Teleport ke Best Zone " .. targetZone)
+            TeleportToZone(targetZone, "Best Zone " .. targetZone)
+            lastUIText = currentText
+            isProcessing = false
         else
-            if isFollowing then
-                StopFollowMode()
+            print("🏆 Sudah di zone maksimal 40!")
+            lastUIText = currentText
+        end
+    else
+        print("⏳ " .. currentText .. " → Diabaikan")
+        lastUIText = currentText
+    end
+end
+
+-- ========== LOOP AUTO UFO ==========
+task.spawn(function()
+    while true do
+        if autoUfoEnabled then
+            local currentText = getUIText()
+            if currentText then
+                processText(currentText)
             end
         end
-        task.wait(1)
+        task.wait(0.5)
     end
 end)
 
@@ -396,15 +456,15 @@ end
 DeleteAutoRejoin()
 task.spawn(function() while true do task.wait(10) DeleteAutoRejoin() end end)
 
--- ========== GUI ==========
+-- ========== GUI UKURAN 3:2 (360 x 240) ==========
 local GUI = Instance.new("ScreenGui")
 GUI.Name = "ZAIXPLOIT"
 GUI.ResetOnSpawn = false
 GUI.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
 local Main = Instance.new("Frame")
-Main.Size = UDim2.new(0, 300, 0, 460)
-Main.Position = UDim2.new(0.5, -150, 0.5, -230)
+Main.Size = UDim2.new(0, 360, 0, 240)  -- 3:2 Ratio
+Main.Position = UDim2.new(0.5, -180, 0.2, 0)
 Main.BackgroundColor3 = Color3.fromRGB(8, 6, 15)
 Main.BackgroundTransparency = 0.05
 Main.BorderSizePixel = 0
@@ -593,190 +653,153 @@ Padding.PaddingTop = UDim.new(0, 6)
 Padding.PaddingBottom = UDim.new(0, 6)
 Padding.Parent = Scroll
 
--- ========== STATUS UFO ==========
-local UfoStatusFrame = Instance.new("Frame")
-UfoStatusFrame.Size = UDim2.new(1, 0, 0, 28)
-UfoStatusFrame.BackgroundColor3 = Color3.fromRGB(18, 16, 32)
-UfoStatusFrame.BackgroundTransparency = 0.2
-UfoStatusFrame.BorderSizePixel = 0
-UfoStatusFrame.Parent = Scroll
-local StatusCorner = Instance.new("UICorner")
-StatusCorner.CornerRadius = UDim.new(0, 5)
-StatusCorner.Parent = UfoStatusFrame
+-- ========== AUTO UFO CARD (BARU - DIPERKECIL) ==========
+local AutoUfoCard = Instance.new("Frame")
+AutoUfoCard.Size = UDim2.new(1, 0, 0, 85)  -- Dipersempit karena ukuran GUI lebih kecil
+AutoUfoCard.BackgroundColor3 = Color3.fromRGB(18, 16, 32)
+AutoUfoCard.BackgroundTransparency = 0.2
+AutoUfoCard.BorderSizePixel = 0
+AutoUfoCard.Parent = Scroll
+local CardCorner = Instance.new("UICorner")
+CardCorner.CornerRadius = UDim.new(0, 5)
+CardCorner.Parent = AutoUfoCard
 
-local UfoStatusIcon = Instance.new("TextLabel")
-UfoStatusIcon.Size = UDim2.new(0, 30, 1, 0)
-UfoStatusIcon.Position = UDim2.new(0, 5, 0, 0)
-UfoStatusIcon.BackgroundTransparency = 1
-UfoStatusIcon.Text = "🔍"
-UfoStatusIcon.TextColor3 = Color3.fromRGB(255, 255, 255)
-UfoStatusIcon.TextSize = 14
-UfoStatusIcon.Parent = UfoStatusFrame
+-- Icon
+local UfoIcon = Instance.new("TextLabel")
+UfoIcon.Size = UDim2.new(0, 35, 1, 0)
+UfoIcon.Position = UDim2.new(0, 5, 0, 0)
+UfoIcon.BackgroundTransparency = 1
+UfoIcon.Text = "🛸"
+UfoIcon.TextColor3 = Color3.fromRGB(100, 200, 255)
+UfoIcon.TextSize = 20
+UfoIcon.Parent = AutoUfoCard
 
-local UfoStatusText = Instance.new("TextLabel")
-UfoStatusText.Size = UDim2.new(1, -40, 1, 0)
-UfoStatusText.Position = UDim2.new(0, 35, 0, 0)
-UfoStatusText.BackgroundTransparency = 1
-UfoStatusText.Text = "Mencari UFO..."
-UfoStatusText.TextColor3 = Color3.fromRGB(200, 200, 200)
-UfoStatusText.TextSize = 10
-UfoStatusText.TextXAlignment = Enum.TextXAlignment.Left
-UfoStatusText.Font = Enum.Font.FredokaOne
-UfoStatusText.Parent = UfoStatusFrame
+-- Title
+local UfoTitle = Instance.new("TextLabel")
+UfoTitle.Size = UDim2.new(1, -80, 0, 16)
+UfoTitle.Position = UDim2.new(0, 45, 0, 4)
+UfoTitle.BackgroundTransparency = 1
+UfoTitle.Text = "AUTO UFO"
+UfoTitle.TextColor3 = Color3.fromRGB(200, 200, 230)
+UfoTitle.Font = Enum.Font.FredokaOne
+UfoTitle.TextSize = 10
+UfoTitle.TextXAlignment = Enum.TextXAlignment.Left
+UfoTitle.Parent = AutoUfoCard
 
--- Update status UFO
+-- Tombol ON/OFF
+local UfoToggleBtn = Instance.new("TextButton")
+UfoToggleBtn.Size = UDim2.new(0, 45, 0, 20)
+UfoToggleBtn.Position = UDim2.new(1, -53, 0, 2)
+UfoToggleBtn.BackgroundColor3 = autoUfoEnabled and Color3.fromRGB(50, 150, 255) or Color3.fromRGB(70, 70, 70)
+UfoToggleBtn.Text = autoUfoEnabled and "ON" or "OFF"
+UfoToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+UfoToggleBtn.Font = Enum.Font.FredokaOne
+UfoToggleBtn.TextSize = 9
+UfoToggleBtn.BorderSizePixel = 0
+UfoToggleBtn.Parent = AutoUfoCard
+local ToggleCorner = Instance.new("UICorner")
+ToggleCorner.CornerRadius = UDim.new(0, 4)
+ToggleCorner.Parent = UfoToggleBtn
+
+-- Teks terbaca
+local textLabel = Instance.new("TextLabel")
+textLabel.Size = UDim2.new(1, -45, 0, 16)
+textLabel.Position = UDim2.new(0, 45, 0, 24)
+textLabel.BackgroundTransparency = 1
+textLabel.Text = "📝 Teks: --"
+textLabel.TextColor3 = Color3.fromRGB(200, 200, 220)
+textLabel.Font = Enum.Font.Gotham
+textLabel.TextSize = 9
+textLabel.TextXAlignment = Enum.TextXAlignment.Left
+textLabel.Parent = AutoUfoCard
+
+-- Status zone
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Size = UDim2.new(1, -45, 0, 16)
+statusLabel.Position = UDim2.new(0, 45, 0, 42)
+statusLabel.BackgroundTransparency = 1
+statusLabel.Text = "🗺️ Status: --"
+statusLabel.TextColor3 = Color3.fromRGB(150, 150, 200)
+statusLabel.Font = Enum.Font.Gotham
+statusLabel.TextSize = 9
+statusLabel.TextXAlignment = Enum.TextXAlignment.Left
+statusLabel.Parent = AutoUfoCard
+
+-- Aksi
+local actionLabel = Instance.new("TextLabel")
+actionLabel.Size = UDim2.new(1, -45, 0, 16)
+actionLabel.Position = UDim2.new(0, 45, 0, 60)
+actionLabel.BackgroundTransparency = 1
+actionLabel.Text = "⚡ Aksi: --"
+actionLabel.TextColor3 = Color3.fromRGB(150, 150, 200)
+actionLabel.Font = Enum.Font.Gotham
+actionLabel.TextSize = 9
+actionLabel.TextXAlignment = Enum.TextXAlignment.Left
+actionLabel.Parent = AutoUfoCard
+
+-- Toggle function
+UfoToggleBtn.MouseButton1Click:Connect(function()
+    autoUfoEnabled = not autoUfoEnabled
+    if autoUfoEnabled then
+        UfoToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 150, 255)
+        UfoToggleBtn.Text = "ON"
+        print("🟢 Auto UFO: ON")
+    else
+        UfoToggleBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+        UfoToggleBtn.Text = "OFF"
+        print("🔴 Auto UFO: OFF")
+    end
+end)
+
+-- Update UI
 task.spawn(function()
     while true do
-        local ufoRoot = workspace:FindFirstChild("UfoEvent") 
-            and workspace.UfoEvent:FindFirstChild("UFO") 
-            and workspace.UfoEvent.UFO:FindFirstChild("Root")
-        
-        if ufoRoot and ufoRoot:IsA("BasePart") then
-            UfoStatusIcon.Text = "🛸"
-            if AutoUfoMode == 2 and AutoUfo then
-                UfoStatusText.Text = "UFO AKTIF - FOLLOW MODE"
+        if GUI and GUI.Parent then
+            local currentText = getUIText()
+            if currentText then
+                textLabel.Text = "📝 Teks: \"" .. currentText .. "\""
+                textLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+                
+                local zoneNum, zoneName = detectZoneFromText(currentText)
+                
+                if zoneNum then
+                    statusLabel.Text = "🗺️ Status: Zone (" .. zoneName .. ")"
+                    statusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+                    if autoUfoEnabled and not isProcessing then
+                        actionLabel.Text = "⚡ Aksi: Teleport ke " .. zoneName
+                        actionLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+                    end
+                elseif isTargetTimer(currentText) then
+                    local colin = GetBestOpenZone()
+                    local targetZone = colin + 1
+                    statusLabel.Text = "📍 Status: Timer 56.00!"
+                    statusLabel.TextColor3 = Color3.fromRGB(255, 200, 100)
+                    if autoUfoEnabled and not isProcessing then
+                        actionLabel.Text = "⚡ Aksi: Best Zone " .. targetZone
+                        actionLabel.TextColor3 = Color3.fromRGB(255, 200, 100)
+                    end
+                else
+                    statusLabel.Text = "🗺️ Status: Diabaikan"
+                    statusLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
+                    actionLabel.Text = "⚡ Aksi: --"
+                    actionLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
+                end
             else
-                UfoStatusText.Text = "UFO SEDANG AKTIF!"
+                textLabel.Text = "📝 Teks: (UI tidak ditemukan)"
+                textLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+                statusLabel.Text = "🗺️ Status: UI tidak ditemukan"
+                statusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+                actionLabel.Text = "⚡ Aksi: --"
             end
-            UfoStatusText.TextColor3 = Color3.fromRGB(100, 255, 100)
-        else
-            UfoStatusIcon.Text = "❌"
-            UfoStatusText.Text = "UFO TIDAK ADA"
-            UfoStatusText.TextColor3 = Color3.fromRGB(255, 100, 100)
         end
-        task.wait(1)
+        task.wait(0.5)
     end
-end)
-
--- ========== AUTO UFO TOGGLE (ON/OFF) ==========
-local UfoFrame = Instance.new("Frame")
-UfoFrame.Size = UDim2.new(1, 0, 0, 32)
-UfoFrame.BackgroundColor3 = Color3.fromRGB(18, 16, 32)
-UfoFrame.BackgroundTransparency = 0.2
-UfoFrame.BorderSizePixel = 0
-UfoFrame.Parent = Scroll
-local UfoCorner = Instance.new("UICorner")
-UfoCorner.CornerRadius = UDim.new(0, 5)
-UfoCorner.Parent = UfoFrame
-
-local UfoLabel = Instance.new("TextLabel")
-UfoLabel.Size = UDim2.new(1, -80, 1, 0)
-UfoLabel.Position = UDim2.new(0, 6, 0, 0)
-UfoLabel.BackgroundTransparency = 1
-UfoLabel.Text = "🛸 Auto UFO"
-UfoLabel.TextColor3 = Color3.fromRGB(200, 200, 230)
-UfoLabel.Font = Enum.Font.FredokaOne
-UfoLabel.TextSize = 11
-UfoLabel.TextXAlignment = Enum.TextXAlignment.Left
-UfoLabel.Parent = UfoFrame
-
-local UfoBtn = Instance.new("TextButton")
-UfoBtn.Size = UDim2.new(0, 60, 0, 24)
-UfoBtn.Position = UDim2.new(1, -68, 0.5, -12)
-UfoBtn.BackgroundColor3 = AutoUfo and Color3.fromRGB(50, 150, 255) or Color3.fromRGB(70, 70, 70)
-UfoBtn.Text = AutoUfo and "ON" or "OFF"
-UfoBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-UfoBtn.Font = Enum.Font.FredokaOne
-UfoBtn.TextSize = 10
-UfoBtn.BorderSizePixel = 0
-UfoBtn.Parent = UfoFrame
-local UfoBtnCorner = Instance.new("UICorner")
-UfoBtnCorner.CornerRadius = UDim.new(0, 5)
-UfoBtnCorner.Parent = UfoBtn
-
-UfoBtn.MouseButton1Click:Connect(function()
-    AutoUfo = not AutoUfo
-    if AutoUfo then
-        UfoBtn.BackgroundColor3 = Color3.fromRGB(50, 150, 255)
-        UfoBtn.Text = "ON"
-        print("🛸 Auto UFO: ON")
-        if AutoUfoMode == 2 then
-            StartFollowMode()
-        end
-    else
-        UfoBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
-        UfoBtn.Text = "OFF"
-        StopFollowMode()
-        print("🛸 Auto UFO: OFF")
-    end
-end)
-
--- ========== MODE SELECTOR (TELEPORT / FOLLOW) ==========
-local ModeFrame = Instance.new("Frame")
-ModeFrame.Size = UDim2.new(1, 0, 0, 32)
-ModeFrame.BackgroundColor3 = Color3.fromRGB(18, 16, 32)
-ModeFrame.BackgroundTransparency = 0.2
-ModeFrame.BorderSizePixel = 0
-ModeFrame.Parent = Scroll
-local ModeCorner = Instance.new("UICorner")
-ModeCorner.CornerRadius = UDim.new(0, 5)
-ModeCorner.Parent = ModeFrame
-
-local ModeLabel = Instance.new("TextLabel")
-ModeLabel.Size = UDim2.new(0.4, 0, 1, 0)
-ModeLabel.Position = UDim2.new(0, 6, 0, 0)
-ModeLabel.BackgroundTransparency = 1
-ModeLabel.Text = "🎮 Mode"
-ModeLabel.TextColor3 = Color3.fromRGB(200, 200, 230)
-ModeLabel.Font = Enum.Font.FredokaOne
-ModeLabel.TextSize = 11
-ModeLabel.TextXAlignment = Enum.TextXAlignment.Left
-ModeLabel.Parent = ModeFrame
-
-local TeleportBtn = Instance.new("TextButton")
-TeleportBtn.Size = UDim2.new(0, 70, 0, 22)
-TeleportBtn.Position = UDim2.new(0.45, 0, 0.5, -11)
-TeleportBtn.BackgroundColor3 = AutoUfoMode == 1 and Color3.fromRGB(50, 150, 255) or Color3.fromRGB(70, 70, 70)
-TeleportBtn.Text = "⚡ TELEPORT"
-TeleportBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-TeleportBtn.Font = Enum.Font.FredokaOne
-TeleportBtn.TextSize = 9
-TeleportBtn.BorderSizePixel = 0
-TeleportBtn.Parent = ModeFrame
-local TeleportCorner = Instance.new("UICorner")
-TeleportCorner.CornerRadius = UDim.new(0, 5)
-TeleportCorner.Parent = TeleportBtn
-
-local FollowBtn = Instance.new("TextButton")
-FollowBtn.Size = UDim2.new(0, 60, 0, 22)
-FollowBtn.Position = UDim2.new(0.73, 0, 0.5, -11)
-FollowBtn.BackgroundColor3 = AutoUfoMode == 2 and Color3.fromRGB(50, 150, 255) or Color3.fromRGB(70, 70, 70)
-FollowBtn.Text = "🌀 FOLLOW"
-FollowBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-FollowBtn.Font = Enum.Font.FredokaOne
-FollowBtn.TextSize = 9
-FollowBtn.BorderSizePixel = 0
-FollowBtn.Parent = ModeFrame
-local FollowCorner = Instance.new("UICorner")
-FollowCorner.CornerRadius = UDim.new(0, 5)
-FollowCorner.Parent = FollowBtn
-
-TeleportBtn.MouseButton1Click:Connect(function()
-    AutoUfoMode = 1
-    TeleportBtn.BackgroundColor3 = Color3.fromRGB(50, 150, 255)
-    FollowBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
-    StopFollowMode()
-    print("⚡ Mode TELEPORT (setiap 33 detik)")
-    if AutoUfo then
-        print("   Akan teleport ke UFO setiap 33 detik")
-    end
-end)
-
-FollowBtn.MouseButton1Click:Connect(function()
-    AutoUfoMode = 2
-    FollowBtn.BackgroundColor3 = Color3.fromRGB(50, 150, 255)
-    TeleportBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
-    if AutoUfo then
-        StartFollowMode()
-    end
-    print("🌀 Mode FOLLOW (nempel terus ke UFO)")
-    print("   Karakter akan selalu mengikuti posisi UFO")
 end)
 
 -- ========== GUI COMPONENTS ==========
 local function MakeModeToggle(Parent, Text, Emoji, GetMode, SetMode)
     local Frame = Instance.new("Frame")
-    Frame.Size = UDim2.new(1, 0, 0, 32)
+    Frame.Size = UDim2.new(1, 0, 0, 28)
     Frame.BackgroundColor3 = Color3.fromRGB(18, 16, 32)
     Frame.BackgroundTransparency = 0.2
     Frame.BorderSizePixel = 0
@@ -786,24 +809,24 @@ local function MakeModeToggle(Parent, Text, Emoji, GetMode, SetMode)
     FCorner.Parent = Frame
     
     local Label = Instance.new("TextLabel")
-    Label.Size = UDim2.new(1, -80, 1, 0)
+    Label.Size = UDim2.new(1, -75, 1, 0)
     Label.Position = UDim2.new(0, 6, 0, 0)
     Label.BackgroundTransparency = 1
     Label.Text = Emoji .. " " .. Text
     Label.TextColor3 = Color3.fromRGB(200, 200, 230)
     Label.Font = Enum.Font.FredokaOne
-    Label.TextSize = 11
+    Label.TextSize = 10
     Label.TextXAlignment = Enum.TextXAlignment.Left
     Label.Parent = Frame
     
     local Btn = Instance.new("TextButton")
-    Btn.Size = UDim2.new(0, 60, 0, 24)
-    Btn.Position = UDim2.new(1, -68, 0.5, -12)
+    Btn.Size = UDim2.new(0, 55, 0, 22)
+    Btn.Position = UDim2.new(1, -63, 0.5, -11)
     Btn.BackgroundColor3 = Color3.fromRGB(50, 150, 255)
     Btn.Text = "NORMAL"
     Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
     Btn.Font = Enum.Font.FredokaOne
-    Btn.TextSize = 10
+    Btn.TextSize = 9
     Btn.BorderSizePixel = 0
     Btn.Parent = Frame
     local BtnCorner = Instance.new("UICorner")
@@ -842,7 +865,7 @@ end
 
 local function MakeToggle(Parent, Text, Emoji, GetState, SetState)
     local Frame = Instance.new("Frame")
-    Frame.Size = UDim2.new(1, 0, 0, 28)
+    Frame.Size = UDim2.new(1, 0, 0, 24)
     Frame.BackgroundColor3 = Color3.fromRGB(18, 16, 32)
     Frame.BackgroundTransparency = 0.2
     Frame.BorderSizePixel = 0
@@ -852,24 +875,24 @@ local function MakeToggle(Parent, Text, Emoji, GetState, SetState)
     FCorner.Parent = Frame
     
     local Label = Instance.new("TextLabel")
-    Label.Size = UDim2.new(1, -55, 1, 0)
+    Label.Size = UDim2.new(1, -50, 1, 0)
     Label.Position = UDim2.new(0, 6, 0, 0)
     Label.BackgroundTransparency = 1
     Label.Text = Emoji .. " " .. Text
     Label.TextColor3 = Color3.fromRGB(200, 200, 230)
     Label.Font = Enum.Font.FredokaOne
-    Label.TextSize = 10
+    Label.TextSize = 9
     Label.TextXAlignment = Enum.TextXAlignment.Left
     Label.Parent = Frame
     
     local Btn = Instance.new("TextButton")
-    Btn.Size = UDim2.new(0, 50, 0, 22)
-    Btn.Position = UDim2.new(1, -58, 0.5, -11)
+    Btn.Size = UDim2.new(0, 45, 0, 20)
+    Btn.Position = UDim2.new(1, -53, 0.5, -10)
     Btn.BackgroundColor3 = GetState() and Color3.fromRGB(50, 150, 255) or Color3.fromRGB(70, 70, 70)
     Btn.Text = GetState() and "ON" or "OFF"
     Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
     Btn.Font = Enum.Font.FredokaOne
-    Btn.TextSize = 10
+    Btn.TextSize = 9
     Btn.BorderSizePixel = 0
     Btn.Parent = Frame
     local BtnCorner = Instance.new("UICorner")
@@ -888,12 +911,12 @@ end
 
 local function MakeTitle(Parent, Text)
     local Label = Instance.new("TextLabel")
-    Label.Size = UDim2.new(1, 0, 0, 20)
+    Label.Size = UDim2.new(1, 0, 0, 18)
     Label.BackgroundTransparency = 1
     Label.Text = Text
     Label.TextColor3 = Color3.fromRGB(0, 150, 255)
     Label.Font = Enum.Font.FredokaOne
-    Label.TextSize = 11
+    Label.TextSize = 10
     Label.TextXAlignment = Enum.TextXAlignment.Left
     Label.Parent = Parent
     return Label
@@ -941,24 +964,24 @@ MakeToggle(Scroll, "Currency Potion", "💵", function() return AutoCurrency end
 MakeToggle(Scroll, "Roll Speed Potion", "⚡", function() return AutoRollSpeed end, function(v) AutoRollSpeed = v end)
 
 local Status = Instance.new("TextLabel")
-Status.Size = UDim2.new(1, -20, 0, 16)
+Status.Size = UDim2.new(1, -20, 0, 14)
 Status.BackgroundTransparency = 1
 Status.Text = "● ANTI AFK ACTIVE"
 Status.TextColor3 = Color3.fromRGB(100, 255, 100)
 Status.Font = Enum.Font.FredokaOne
-Status.TextSize = 10
+Status.TextSize = 9
 Status.TextXAlignment = Enum.TextXAlignment.Left
 Status.Parent = Scroll
 
 MinBtn.MouseButton1Click:Connect(function()
     isMinimized = not isMinimized
     if isMinimized then
-        Main.Size = UDim2.new(0, 300, 0, 35)
+        Main.Size = UDim2.new(0, 360, 0, 35)
         Scroll.Visible = false
         SideLamp.Visible = false
         MinBtn.Text = "+"
     else
-        Main.Size = UDim2.new(0, 300, 0, 460)
+        Main.Size = UDim2.new(0, 360, 0, 240)
         Scroll.Visible = true
         SideLamp.Visible = true
         MinBtn.Text = "−"
@@ -966,21 +989,16 @@ MinBtn.MouseButton1Click:Connect(function()
 end)
 
 print("═══════════════════════════════════════════")
-print("   ZAIXPLOIT | SLIME RNG + AUTO UFO 2 MODE")
+print("   ZAIXPLOIT | SLIME RNG + AUTO UFO BARU")
 print("═══════════════════════════════════════════")
-print("✅ AUTO UFO (ON by default)")
-print("   → Mode 1 (TELEPORT): Teleport setiap 33 detik")
-print("   → Mode 2 (FOLLOW): Nempel terus ke UFO")
+print("✅ AUTO UFO (DETECT UI) - Rasio 3:2")
+print("   → Nama Zone (exact match) → Teleport ke zone")
+print("   → Timer 56.00 → Teleport ke Best Zone (Colin+1)")
+print("   → Timer lain → Diabaikan")
 print("✅ AUTO BUY ZONE (MAX 40)")
-print("   → Beli zone, tunggu 3s, teleport ke Best Zone")
 print("✅ AUTO GUN | AUTO ROLL (OFF/NORMAL/FAST)")
 print("✅ AUTO INDEX | AUTO FARM LOOT | AUTO FARM FRUIT")
 print("✅ AUTO UPGRADE | AUTO REBIRTH")
 print("✅ AUTO POTION (4 BOOSTS)")
 print("🚀 SCRIPT SIAP DIGUNAKAN")
 print("═══════════════════════════════════════════")
-
--- Start follow mode if default mode is 2
-if AutoUfo and AutoUfoMode == 2 then
-    StartFollowMode()
-end
