@@ -120,7 +120,7 @@ end
 local function isTargetTimer(text)
     if not text then return false end
     -- Cek apakah teks adalah "59.30" atau "59:30"
-    return text == "59.30" or text == "59:30"
+    return text == "59.55" or text == "59:55"
 end
 
 -- ========== TELEPORT KE ZONE ==========
@@ -170,7 +170,7 @@ local function processText(currentText)
         local targetZone = colin + 1
         if targetZone <= 40 then
             isProcessing = true
-            print("📍 " .. currentText .. " → Timer 59.30! Teleport ke Best Zone " .. targetZone)
+            print("📍 " .. currentText .. " → Timer 59.55! Teleport ke Best Zone " .. targetZone)
             TeleportToZone(targetZone, "Best Zone " .. targetZone)
             lastUIText = currentText
             isProcessing = false
