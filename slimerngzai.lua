@@ -40,7 +40,7 @@ local zoneList = {
     { num = 8, name = "Jungle", patterns = {"jungle"} },
     { num = 9, name = "Canyon", patterns = {"canyon"} },
     { num = 10, name = "Mushroom Forest", patterns = {"mushroom forest"} },
-    { num = 11, name = "Mushroom Soup", patterns = {"mushroom soup"} },
+    { num = 11, name = "Moon", patterns = {"moon"} },
     { num = 12, name = "Redwood Forest", patterns = {"redwood forest"} },
     { num = 13, name = "Meteor", patterns = {"meteor"} },
     { num = 14, name = "Candyland", patterns = {"candyland"} },
