@@ -2,10 +2,13 @@
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
 
 -- ========== KONFIGURASI ==========
 local autoUfoEnabled = true
+local isMinimized = false
 local lastUIText = nil
+local isProcessing = false
 
 -- ========== DATA NAMA ZONE (1-40) ==========
 local zoneList = {
@@ -143,22 +146,31 @@ end
 
 -- ========== PROSES TEKS (1x PER PERUBAHAN) ==========
 local function processText(currentText)
+    if isProcessing then return end
     if currentText == lastUIText then return end
+    
+    isProcessing = true
     
     local zoneNum, zoneName = detectZoneFromText(currentText)
     
     if zoneNum then
+        -- NAMA ZONE → TELEPORT KE ZONE TERSEBUT
         print("🎯 " .. currentText .. " → Teleport ke " .. zoneName)
         TeleportToZone(zoneNum)
     else
-        local bestZone = GetBestOpenZone()
-        if bestZone > 0 then
-            print("❌ " .. currentText .. " → Teleport ke Best Zone: " .. bestZone)
-            TeleportToZone(bestZone)
+        -- BUKAN ZONE → TELEPORT KE Colin + 1
+        local colin = GetBestOpenZone()
+        local targetZone = colin + 1
+        if targetZone <= 40 then
+            print("❌ " .. currentText .. " → Colin: " .. colin .. " → Teleport ke Zone " .. targetZone)
+            TeleportToZone(targetZone)
+        else
+            print("🏆 Sudah di zone maksimal 40!")
         end
     end
     
     lastUIText = currentText
+    isProcessing = false
 end
 
 -- ========== LOOP ==========
@@ -174,216 +186,333 @@ task.spawn(function()
     end
 end)
 
--- ========== GUI ==========
+-- ========== GUI (Style kek Santet Slime) ==========
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "AutoUfoBestZone"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
-local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 320, 0, 150)
-frame.Position = UDim2.new(0.5, -160, 0.2, 0)
-frame.BackgroundColor3 = Color3.fromRGB(8, 6, 15)
-frame.BackgroundTransparency = 0.05
-frame.BorderSizePixel = 0
-frame.Active = true
-frame.Draggable = true
-frame.Parent = screenGui
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 280, 0, 200)
+mainFrame.Position = UDim2.new(0.5, -140, 0.2, 0)
+mainFrame.BackgroundColor3 = Color3.fromRGB(20, 18, 30)
+mainFrame.BackgroundTransparency = 0.1
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Parent = screenGui
 
 local corner = Instance.new("UICorner")
-corner.CornerRadius = UDim.new(0, 12)
-corner.Parent = frame
+corner.CornerRadius = UDim.new(0, 10)
+corner.Parent = mainFrame
 
 local stroke = Instance.new("UIStroke")
-stroke.Color = Color3.fromRGB(0, 150, 255)
-stroke.Thickness = 1
+stroke.Color = Color3.fromRGB(80, 200, 80)
 stroke.Transparency = 0.3
-stroke.Parent = frame
+stroke.Thickness = 1
+stroke.Parent = mainFrame
 
 -- Side Lamp
 local sideLamp = Instance.new("Frame")
-sideLamp.Size = UDim2.new(0, 4, 1, -10)
-sideLamp.Position = UDim2.new(0, 2, 0, 5)
-sideLamp.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
+sideLamp.Size = UDim2.new(0, 3, 1, -8)
+sideLamp.Position = UDim2.new(0, -5, 0, 4)
+sideLamp.BackgroundColor3 = Color3.fromRGB(80, 255, 80)
 sideLamp.BorderSizePixel = 0
-sideLamp.Parent = frame
+sideLamp.Parent = mainFrame
 local sideCorner = Instance.new("UICorner")
-sideCorner.CornerRadius = UDim.new(0, 2)
+sideCorner.CornerRadius = UDim.new(0, 3)
 sideCorner.Parent = sideLamp
 
 -- Title Bar
 local titleBar = Instance.new("Frame")
-titleBar.Size = UDim2.new(1, 0, 0, 38)
-titleBar.BackgroundColor3 = Color3.fromRGB(15, 13, 25)
-titleBar.BackgroundTransparency = 0.3
+titleBar.Size = UDim2.new(1, 0, 0, 35)
+titleBar.BackgroundColor3 = Color3.fromRGB(25, 22, 38)
+titleBar.BackgroundTransparency = 0.5
 titleBar.BorderSizePixel = 0
-titleBar.Parent = frame
+titleBar.Parent = mainFrame
 
 local titleCorner = Instance.new("UICorner")
-titleCorner.CornerRadius = UDim.new(0, 12)
+titleCorner.CornerRadius = UDim.new(0, 10)
 titleCorner.Parent = titleBar
 
-local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, -80, 1, 0)
-title.Position = UDim2.new(0, 15, 0, 0)
-title.BackgroundTransparency = 1
-title.Text = "🛸 AUTO UFO"
-title.TextColor3 = Color3.fromRGB(255, 215, 0)
-title.Font = Enum.Font.GothamBold
-title.TextSize = 12
-title.TextXAlignment = Enum.TextXAlignment.Left
-title.Parent = titleBar
+-- Indicator Light
+local indicatorLight = Instance.new("Frame")
+indicatorLight.Size = UDim2.new(0, 8, 0, 8)
+indicatorLight.Position = UDim2.new(0, 10, 0, 13)
+indicatorLight.BackgroundColor3 = Color3.fromRGB(80, 255, 80)
+indicatorLight.BorderSizePixel = 0
+indicatorLight.Parent = titleBar
+local lightCorner = Instance.new("UICorner")
+lightCorner.CornerRadius = UDim.new(1, 0)
+lightCorner.Parent = indicatorLight
 
--- Tombol ON/OFF
+local titleText = Instance.new("TextLabel")
+titleText.Size = UDim2.new(1, -70, 0, 18)
+titleText.Position = UDim2.new(0, 28, 0, 3)
+titleText.BackgroundTransparency = 1
+titleText.Text = "AUTO UFO"
+titleText.TextColor3 = Color3.fromRGB(255, 255, 255)
+titleText.Font = Enum.Font.FredokaOne
+titleText.TextSize = 12
+titleText.TextXAlignment = Enum.TextXAlignment.Left
+titleText.Parent = titleBar
+
+local subTitleText = Instance.new("TextLabel")
+subTitleText.Size = UDim2.new(1, -70, 0, 12)
+subTitleText.Position = UDim2.new(0, 28, 0, 20)
+subTitleText.BackgroundTransparency = 1
+subTitleText.Text = "DETECT UI + BEST ZONE"
+subTitleText.TextColor3 = Color3.fromRGB(150, 150, 200)
+subTitleText.Font = Enum.Font.FredokaOne
+subTitleText.TextSize = 8
+subTitleText.TextXAlignment = Enum.TextXAlignment.Left
+subTitleText.Parent = titleBar
+
+-- Minimize Button
+local minBtn = Instance.new("TextButton")
+minBtn.Size = UDim2.new(0, 22, 0, 22)
+minBtn.Position = UDim2.new(1, -28, 0, 6)
+minBtn.BackgroundColor3 = Color3.fromRGB(60, 55, 80)
+minBtn.BackgroundTransparency = 0.3
+minBtn.Text = "−"
+minBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+minBtn.Font = Enum.Font.GothamBold
+minBtn.TextSize = 16
+minBtn.AutoButtonColor = true
+minBtn.Parent = titleBar
+local minCorner = Instance.new("UICorner")
+minCorner.CornerRadius = UDim.new(0, 5)
+minCorner.Parent = minBtn
+
+-- Toggle Button (ON/OFF)
 local toggleBtn = Instance.new("TextButton")
-toggleBtn.Size = UDim2.new(0, 60, 0, 26)
-toggleBtn.Position = UDim2.new(1, -72, 0.5, -13)
-toggleBtn.BackgroundColor3 = autoUfoEnabled and Color3.fromRGB(50, 200, 80) or Color3.fromRGB(200, 50, 50)
-toggleBtn.Text = autoUfoEnabled and "ON" or "OFF"
+toggleBtn.Size = UDim2.new(0, 55, 0, 24)
+toggleBtn.Position = UDim2.new(1, -90, 0, 5)
+toggleBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 80)
+toggleBtn.BackgroundTransparency = 0
+toggleBtn.Text = "ON"
 toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-toggleBtn.Font = Enum.Font.GothamBold
-toggleBtn.TextSize = 12
-toggleBtn.BorderSizePixel = 0
+toggleBtn.Font = Enum.Font.FredokaOne
+toggleBtn.TextSize = 11
+toggleBtn.AutoButtonColor = false
 toggleBtn.Parent = titleBar
+local toggleCorner = Instance.new("UICorner")
+toggleCorner.CornerRadius = UDim.new(0, 5)
+toggleCorner.Parent = toggleBtn
 
-local btnCorner = Instance.new("UICorner")
-btnCorner.CornerRadius = UDim.new(0, 6)
-btnCorner.Parent = toggleBtn
+-- Content Frame
+local contentFrame = Instance.new("Frame")
+contentFrame.Size = UDim2.new(1, 0, 1, -35)
+contentFrame.Position = UDim2.new(0, 0, 0, 35)
+contentFrame.BackgroundTransparency = 1
+contentFrame.Parent = mainFrame
 
--- Icon
-local icon = Instance.new("TextLabel")
-icon.Size = UDim2.new(0, 45, 0, 45)
-icon.Position = UDim2.new(0, 12, 0, 50)
-icon.BackgroundTransparency = 1
-icon.Text = "🛸"
-icon.TextColor3 = Color3.fromRGB(100, 200, 255)
-icon.TextSize = 26
-icon.Parent = frame
+-- Teks Terakhir Card
+local lastTextCard = Instance.new("Frame")
+lastTextCard.Size = UDim2.new(1, -20, 0, 45)
+lastTextCard.Position = UDim2.new(0, 10, 0, 10)
+lastTextCard.BackgroundColor3 = Color3.fromRGB(25, 22, 40)
+lastTextCard.BackgroundTransparency = 0.2
+lastTextCard.BorderSizePixel = 0
+lastTextCard.Parent = contentFrame
+local cardCorner = Instance.new("UICorner")
+cardCorner.CornerRadius = UDim.new(0, 6)
+cardCorner.Parent = lastTextCard
 
--- Status Text
-local statusText = Instance.new("TextLabel")
-statusText.Size = UDim2.new(1, -65, 0, 20)
-statusText.Position = UDim2.new(0, 65, 0, 52)
-statusText.BackgroundTransparency = 1
-statusText.Text = "📡 Menunggu perubahan..."
-statusText.TextColor3 = Color3.fromRGB(200, 200, 220)
-statusText.Font = Enum.Font.Gotham
-statusText.TextSize = 11
-statusText.TextXAlignment = Enum.TextXAlignment.Left
-statusText.Parent = frame
+local lastTextIcon = Instance.new("TextLabel")
+lastTextIcon.Size = UDim2.new(0, 30, 1, 0)
+lastTextIcon.Position = UDim2.new(0, 5, 0, 0)
+lastTextIcon.BackgroundTransparency = 1
+lastTextIcon.Text = "📝"
+lastTextIcon.TextColor3 = Color3.fromRGB(100, 200, 255)
+lastTextIcon.TextSize = 16
+lastTextIcon.Parent = lastTextCard
 
--- Teks Terakhir
-local lastTextLabel = Instance.new("TextLabel")
-lastTextLabel.Size = UDim2.new(1, -65, 0, 18)
-lastTextLabel.Position = UDim2.new(0, 65, 0, 75)
-lastTextLabel.BackgroundTransparency = 1
-lastTextLabel.Text = "📝 Teks: --"
-lastTextLabel.TextColor3 = Color3.fromRGB(150, 150, 200)
-lastTextLabel.Font = Enum.Font.Gotham
-lastTextLabel.TextSize = 10
-lastTextLabel.TextXAlignment = Enum.TextXAlignment.Left
-lastTextLabel.Parent = frame
+local lastTextTitle = Instance.new("TextLabel")
+lastTextTitle.Size = UDim2.new(1, -40, 0, 16)
+lastTextTitle.Position = UDim2.new(0, 40, 0, 4)
+lastTextTitle.BackgroundTransparency = 1
+lastTextTitle.Text = "TEKS TERAKHIR"
+lastTextTitle.TextColor3 = Color3.fromRGB(150, 150, 200)
+lastTextTitle.Font = Enum.Font.FredokaOne
+lastTextTitle.TextSize = 8
+lastTextTitle.TextXAlignment = Enum.TextXAlignment.Left
+lastTextTitle.Parent = lastTextCard
 
--- Status Zone
-local zoneStatusLabel = Instance.new("TextLabel")
-zoneStatusLabel.Size = UDim2.new(1, -65, 0, 18)
-zoneStatusLabel.Position = UDim2.new(0, 65, 0, 95)
-zoneStatusLabel.BackgroundTransparency = 1
-zoneStatusLabel.Text = "🗺️ Status: --"
-zoneStatusLabel.TextColor3 = Color3.fromRGB(150, 150, 200)
-zoneStatusLabel.Font = Enum.Font.Gotham
-zoneStatusLabel.TextSize = 10
-zoneStatusLabel.TextXAlignment = Enum.TextXAlignment.Left
-zoneStatusLabel.Parent = frame
+local lastTextValue = Instance.new("TextLabel")
+lastTextValue.Size = UDim2.new(1, -40, 0, 20)
+lastTextValue.Position = UDim2.new(0, 40, 0, 22)
+lastTextValue.BackgroundTransparency = 1
+lastTextValue.Text = "--"
+lastTextValue.TextColor3 = Color3.fromRGB(200, 200, 220)
+lastTextValue.Font = Enum.Font.FredokaOne
+lastTextValue.TextSize = 11
+lastTextValue.TextXAlignment = Enum.TextXAlignment.Left
+lastTextValue.Parent = lastTextCard
 
--- Aksi
-local actionLabel = Instance.new("TextLabel")
-actionLabel.Size = UDim2.new(1, -65, 0, 18)
-actionLabel.Position = UDim2.new(0, 65, 0, 115)
-actionLabel.BackgroundTransparency = 1
-actionLabel.Text = "⚡ Aksi: --"
-actionLabel.TextColor3 = Color3.fromRGB(150, 150, 200)
-actionLabel.Font = Enum.Font.Gotham
-actionLabel.TextSize = 10
-actionLabel.TextXAlignment = Enum.TextXAlignment.Left
-actionLabel.Parent = frame
+-- Status Zone Card
+local statusCard = Instance.new("Frame")
+statusCard.Size = UDim2.new(1, -20, 0, 45)
+statusCard.Position = UDim2.new(0, 10, 0, 62)
+statusCard.BackgroundColor3 = Color3.fromRGB(25, 22, 40)
+statusCard.BackgroundTransparency = 0.2
+statusCard.BorderSizePixel = 0
+statusCard.Parent = contentFrame
+local statusCorner = Instance.new("UICorner")
+statusCorner.CornerRadius = UDim.new(0, 6)
+statusCorner.Parent = statusCard
 
--- Toggle function
+local statusIcon = Instance.new("TextLabel")
+statusIcon.Size = UDim2.new(0, 30, 1, 0)
+statusIcon.Position = UDim2.new(0, 5, 0, 0)
+statusIcon.BackgroundTransparency = 1
+statusIcon.Text = "🗺️"
+statusIcon.TextColor3 = Color3.fromRGB(100, 200, 255)
+statusIcon.TextSize = 16
+statusIcon.Parent = statusCard
+
+local statusTitle = Instance.new("TextLabel")
+statusTitle.Size = UDim2.new(1, -40, 0, 16)
+statusTitle.Position = UDim2.new(0, 40, 0, 4)
+statusTitle.BackgroundTransparency = 1
+statusTitle.Text = "STATUS ZONE"
+statusTitle.TextColor3 = Color3.fromRGB(150, 150, 200)
+statusTitle.Font = Enum.Font.FredokaOne
+statusTitle.TextSize = 8
+statusTitle.TextXAlignment = Enum.TextXAlignment.Left
+statusTitle.Parent = statusCard
+
+local statusValue = Instance.new("TextLabel")
+statusValue.Size = UDim2.new(1, -40, 0, 20)
+statusValue.Position = UDim2.new(0, 40, 0, 22)
+statusValue.BackgroundTransparency = 1
+statusValue.Text = "Menunggu..."
+statusValue.TextColor3 = Color3.fromRGB(200, 200, 200)
+statusValue.Font = Enum.Font.FredokaOne
+statusValue.TextSize = 11
+statusValue.TextXAlignment = Enum.TextXAlignment.Left
+statusValue.Parent = statusCard
+
+-- Aksi Card
+local actionCard = Instance.new("Frame")
+actionCard.Size = UDim2.new(1, -20, 0, 45)
+actionCard.Position = UDim2.new(0, 10, 0, 114)
+actionCard.BackgroundColor3 = Color3.fromRGB(25, 22, 40)
+actionCard.BackgroundTransparency = 0.2
+actionCard.BorderSizePixel = 0
+actionCard.Parent = contentFrame
+local actionCorner = Instance.new("UICorner")
+actionCorner.CornerRadius = UDim.new(0, 6)
+actionCorner.Parent = actionCard
+
+local actionIcon = Instance.new("TextLabel")
+actionIcon.Size = UDim2.new(0, 30, 1, 0)
+actionIcon.Position = UDim2.new(0, 5, 0, 0)
+actionIcon.BackgroundTransparency = 1
+actionIcon.Text = "⚡"
+actionIcon.TextColor3 = Color3.fromRGB(100, 200, 255)
+actionIcon.TextSize = 16
+actionIcon.Parent = actionCard
+
+local actionTitle = Instance.new("TextLabel")
+actionTitle.Size = UDim2.new(1, -40, 0, 16)
+actionTitle.Position = UDim2.new(0, 40, 0, 4)
+actionTitle.BackgroundTransparency = 1
+actionTitle.Text = "AKSI"
+actionTitle.TextColor3 = Color3.fromRGB(150, 150, 200)
+actionTitle.Font = Enum.Font.FredokaOne
+actionTitle.TextSize = 8
+actionTitle.TextXAlignment = Enum.TextXAlignment.Left
+actionTitle.Parent = actionCard
+
+local actionValue = Instance.new("TextLabel")
+actionValue.Size = UDim2.new(1, -40, 0, 20)
+actionValue.Position = UDim2.new(0, 40, 0, 22)
+actionValue.BackgroundTransparency = 1
+actionValue.Text = "Menunggu..."
+actionValue.TextColor3 = Color3.fromRGB(200, 200, 200)
+actionValue.Font = Enum.Font.FredokaOne
+actionValue.TextSize = 11
+actionValue.TextXAlignment = Enum.TextXAlignment.Left
+actionValue.Parent = actionCard
+
+-- Minimize Function
+minBtn.MouseButton1Click:Connect(function()
+    isMinimized = not isMinimized
+    if isMinimized then
+        mainFrame.Size = UDim2.new(0, 280, 0, 35)
+        contentFrame.Visible = false
+        minBtn.Text = "+"
+    else
+        mainFrame.Size = UDim2.new(0, 280, 0, 200)
+        contentFrame.Visible = true
+        minBtn.Text = "−"
+    end
+end)
+
+-- Toggle Function
 toggleBtn.MouseButton1Click:Connect(function()
     autoUfoEnabled = not autoUfoEnabled
     if autoUfoEnabled then
         toggleBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 80)
         toggleBtn.Text = "ON"
-        sideLamp.BackgroundColor3 = Color3.fromRGB(0, 255, 100)
-        statusText.Text = "✅ AUTO UFO ON"
-        statusText.TextColor3 = Color3.fromRGB(100, 255, 100)
+        sideLamp.BackgroundColor3 = Color3.fromRGB(80, 255, 80)
+        stroke.Color = Color3.fromRGB(80, 200, 80)
+        indicatorLight.BackgroundColor3 = Color3.fromRGB(80, 255, 80)
         print("🟢 Auto UFO: ON")
-        task.wait(2)
-        statusText.Text = "📡 Menunggu perubahan..."
-        statusText.TextColor3 = Color3.fromRGB(200, 200, 220)
+        TweenService:Create(sideLamp, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(80, 255, 80)}):Play()
+        TweenService:Create(stroke, TweenInfo.new(0.2), {Color = Color3.fromRGB(80, 200, 80)}):Play()
+        TweenService:Create(indicatorLight, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(80, 255, 80)}):Play()
     else
-        toggleBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        toggleBtn.BackgroundColor3 = Color3.fromRGB(40, 35, 55)
         toggleBtn.Text = "OFF"
         sideLamp.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
-        statusText.Text = "⏸️ AUTO UFO OFF"
-        statusText.TextColor3 = Color3.fromRGB(255, 150, 150)
+        stroke.Color = Color3.fromRGB(255, 50, 50)
+        indicatorLight.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
         print("🔴 Auto UFO: OFF")
+        TweenService:Create(sideLamp, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(255, 50, 50)}):Play()
+        TweenService:Create(stroke, TweenInfo.new(0.2), {Color = Color3.fromRGB(255, 50, 50)}):Play()
+        TweenService:Create(indicatorLight, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(255, 50, 50)}):Play()
     end
 end)
 
--- Update UI
+-- Update UI (tanpa spam)
 task.spawn(function()
     while true do
         if screenGui and screenGui.Parent then
             local currentText = getUIText()
             if currentText then
-                lastTextLabel.Text = "📝 Teks: \"" .. currentText .. "\""
+                lastTextValue.Text = currentText
+                lastTextValue.TextColor3 = Color3.fromRGB(100, 255, 100)
                 
                 local zoneNum, zoneName = detectZoneFromText(currentText)
                 
                 if zoneNum then
-                    zoneStatusLabel.Text = "🗺️ Status: Zone terdeteksi! (" .. zoneName .. ")"
-                    zoneStatusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
-                    if autoUfoEnabled then
-                        actionLabel.Text = "⚡ Aksi: Teleport ke " .. zoneName
-                        actionLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+                    statusValue.Text = "Zone terdeteksi! (" .. zoneName .. ")"
+                    statusValue.TextColor3 = Color3.fromRGB(100, 255, 100)
+                    if autoUfoEnabled and not isProcessing then
+                        actionValue.Text = "Teleport ke " .. zoneName
+                        actionValue.TextColor3 = Color3.fromRGB(100, 255, 100)
                     end
                 else
-                    zoneStatusLabel.Text = "🗺️ Status: Zone tidak terdeteksi"
-                    zoneStatusLabel.TextColor3 = Color3.fromRGB(255, 150, 100)
-                    if autoUfoEnabled then
-                        local bestZone = GetBestOpenZone()
-                        actionLabel.Text = "⚡ Aksi: Teleport ke Best Zone " .. bestZone
-                        actionLabel.TextColor3 = Color3.fromRGB(255, 200, 100)
+                    local colin = GetBestOpenZone()
+                    local targetZone = colin + 1
+                    statusValue.Text = "Zone tidak terdeteksi"
+                    statusValue.TextColor3 = Color3.fromRGB(255, 150, 100)
+                    if autoUfoEnabled and not isProcessing then
+                        actionValue.Text = "Teleport ke Best Zone " .. targetZone
+                        actionValue.TextColor3 = Color3.fromRGB(255, 200, 100)
                     end
                 end
             else
-                lastTextLabel.Text = "📝 Teks: (UI tidak ditemukan)"
-                zoneStatusLabel.Text = "🗺️ Status: UI tidak ditemukan"
-                zoneStatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
-                actionLabel.Text = "⚡ Aksi: --"
+                lastTextValue.Text = "(UI tidak ditemukan)"
+                lastTextValue.TextColor3 = Color3.fromRGB(255, 100, 100)
+                statusValue.Text = "UI tidak ditemukan"
+                statusValue.TextColor3 = Color3.fromRGB(255, 100, 100)
+                actionValue.Text = "--"
             end
         end
         task.wait(0.5)
-    end
-end)
-
--- Efek side lamp
-task.spawn(function()
-    while true do
-        if autoUfoEnabled then
-            for i = 0.5, 1, 0.1 do
-                sideLamp.BackgroundTransparency = i
-                task.wait(0.05)
-            end
-            for i = 1, 0.5, -0.1 do
-                sideLamp.BackgroundTransparency = i
-                task.wait(0.05)
-            end
-        else
-            sideLamp.BackgroundTransparency = 0
-            task.wait(0.5)
-        end
     end
 end)
 
@@ -392,7 +521,7 @@ print("   AUTO UFO - DETECT UI + BEST ZONE")
 print("═══════════════════════════════════════════")
 print("📡 Membaca dari: PlayerGui.Root.UfoStatusRoot")
 print("🎯 Nama Zone → Teleport ke zone tersebut")
-print("❌ Bukan zone → Teleport ke Best Zone (Colin)")
-print("🖱️ GUI bisa di-drag dari title bar")
+print("❌ Bukan zone → Teleport ke Colin + 1")
+print("🖱️ GUI bisa di-drag | [−] Minimize")
 print("🔘 Tombol ON/OFF")
 print("═══════════════════════════════════════════")
