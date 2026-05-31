@@ -1,22 +1,17 @@
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 local VirtualUser = game:GetService("VirtualUser")
 
 -- ========== FITUR ==========
-local AutoMobs = false
-local AutoConvertSP = false
+local AutoTween = false
 local isMinimized = false
 local currentTab = "MAIN"
 
 -- Config
 local CONFIG = {
     TweenSpeed = 0.3,
-    AttackSpeed = 0.1,
-    ConvertAmount = 30,
-    ConvertDelay = 0.03,
-    ScanDelay = 0.5 -- Scan setiap 0.5 detik
+    ScanDelay = 0.5
 }
 
 -- ========== DATA ZONE ==========
@@ -42,64 +37,14 @@ local raidZones = {
     "Volcano Island"
 }
 
--- ========== REMOTE ==========
-local hitMobRemote = nil
-local convertSPRemote = nil
-
-pcall(function()
-    local Packages = ReplicatedStorage:FindFirstChild("Packages")
-    if Packages then
-        local Index = Packages:FindFirstChild("_Index")
-        if Index then
-            local Net = Index:FindFirstChild("leifstout_networker@0.3.1")
-            if Net then
-                local NW = Net:FindFirstChild("networker")
-                if NW then
-                    local RemotesFolder = NW:FindFirstChild("_remotes")
-                    if RemotesFolder then
-                        local function getRemote(name)
-                            local remote = RemotesFolder:FindFirstChild(name)
-                            if remote then
-                                return remote:FindFirstChild("RemoteFunction") or remote:FindFirstChild("RemoteEvent")
-                            end
-                            return nil
-                        end
-                        hitMobRemote = getRemote("HitMob")
-                        convertSPRemote = getRemote("ConvertMana")
-                    end
-                end
-            end
-        end
-    end
-end)
-
-if not hitMobRemote then
-    local Remotes = ReplicatedStorage:FindFirstChild("Remotes")
-    if Remotes then
-        hitMobRemote = Remotes:FindFirstChild("HitMob")
-        convertSPRemote = Remotes:FindFirstChild("ConvertMana")
-    end
-end
-
--- ========== FUNGSI TELEPORT BIASA KE SPAWNS ==========
+-- ========== FUNGSI TELEPORT ==========
 local function teleportToSpawn(zoneName)
     local areas = workspace:FindFirstChild("Areas")
-    if not areas then
-        print("❌ Folder Areas tidak ditemukan!")
-        return
-    end
-    
+    if not areas then return end
     local area = areas:FindFirstChild(zoneName)
-    if not area then
-        print("❌ Zone " .. zoneName .. " tidak ditemukan!")
-        return
-    end
-    
+    if not area then return end
     local spawns = area:FindFirstChild("SPAWNS")
-    if not spawns then
-        print("❌ Folder SPAWNS tidak ditemukan di " .. zoneName)
-        return
-    end
+    if not spawns then return end
     
     local targetPart = nil
     for _, part in pairs(spawns:GetChildren()) do
@@ -108,11 +53,7 @@ local function teleportToSpawn(zoneName)
             break
         end
     end
-    
-    if not targetPart then
-        print("❌ Tidak ada spawn part di " .. zoneName)
-        return
-    end
+    if not targetPart then return end
     
     local char = LocalPlayer.Character
     if not char then return end
@@ -120,28 +61,16 @@ local function teleportToSpawn(zoneName)
     if not rootPart then return end
     
     rootPart.CFrame = CFrame.new(targetPart.Position)
-    print("✅ Teleport ke " .. zoneName .. " [SPAWN]")
+    print("✅ Teleport ke " .. zoneName)
 end
 
--- ========== FUNGSI TELEPORT RAID KE BOSSRAIDAREA ==========
 local function teleportToRaid(zoneName)
     local areas = workspace:FindFirstChild("Areas")
-    if not areas then
-        print("❌ Folder Areas tidak ditemukan!")
-        return
-    end
-    
+    if not areas then return end
     local area = areas:FindFirstChild(zoneName)
-    if not area then
-        print("❌ Zone " .. zoneName .. " tidak ditemukan!")
-        return
-    end
-    
+    if not area then return end
     local raidArea = area:FindFirstChild("BossRaidArea")
-    if not raidArea then
-        print("❌ BossRaidArea tidak ditemukan di " .. zoneName)
-        return
-    end
+    if not raidArea then return end
     
     local targetPart = nil
     if raidArea:IsA("BasePart") then
@@ -154,11 +83,7 @@ local function teleportToRaid(zoneName)
             end
         end
     end
-    
-    if not targetPart then
-        print("❌ Tidak ada target part di BossRaidArea " .. zoneName)
-        return
-    end
+    if not targetPart then return end
     
     local char = LocalPlayer.Character
     if not char then return end
@@ -169,21 +94,18 @@ local function teleportToRaid(zoneName)
     print("✅ Teleport ke " .. zoneName .. " [RAID]")
 end
 
--- ========== FUNGSI AUTO MOBS (SCAN 0.5 DETIK) ==========
-local function getMobId(mob)
-    local attrs = mob:GetAttributes()
-    if attrs.ID then return attrs.ID end
-    if attrs.Id then return attrs.Id end
-    return nil
-end
-
+-- ========== FUNGSI AUTO TWEEN (HANYA TWEEN) ==========
 local function tweenToModel(model)
     local char = LocalPlayer.Character
     if not char then return false end
+    
     local rootPart = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Head")
     if not rootPart then return false end
+    
     local targetPart = model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("Head") or model:FindFirstChildWhichIsA("BasePart")
     if not targetPart then return false end
+    
+    -- Tween ke posisi target (nempel)
     local targetPos = targetPart.Position + Vector3.new(2, 0, 2)
     local tween = TweenService:Create(rootPart, TweenInfo.new(CONFIG.TweenSpeed, Enum.EasingStyle.Quad), {CFrame = CFrame.new(targetPos)})
     tween:Play()
@@ -191,88 +113,53 @@ local function tweenToModel(model)
     return true
 end
 
-local function hitMob(mobId)
-    if not mobId or not hitMobRemote then return end
-    pcall(function()
-        if hitMobRemote.ClassName == "RemoteEvent" then
-            hitMobRemote:FireServer(mobId)
-        else
-            hitMobRemote:FireServer(unpack({{{mobId, 0, nil}}}))
-        end
-    end)
-end
-
-local function isAlive(model)
-    if not model or not model.Parent then return false end
-    local humanoid = model:FindFirstChild("Humanoid")
-    return humanoid and humanoid.Health > 0
-end
-
--- Loop Auto Mobs (scan setiap 0.5 detik, fokus 1 target sampai mati)
+-- Loop Auto Tween (scan 0.5 detik, tween ke model di folder Mobs)
 task.spawn(function()
-    local currentTarget = nil
-    local currentTargetId = nil
+    local currentIndex = 1
+    local mobsList = {}
     
     while true do
-        if AutoMobs then
+        if AutoTween then
             local mobsFolder = workspace:FindFirstChild("Mobs")
             
             if mobsFolder then
-                -- Jika tidak ada target atau target sudah mati, cari target baru
-                if not currentTarget or not isAlive(currentTarget) then
-                    currentTarget = nil
-                    currentTargetId = nil
-                    
-                    -- Cari mob hidup pertama
-                    for _, mob in pairs(mobsFolder:GetChildren()) do
-                        if mob:IsA("Model") then
-                            local mobId = getMobId(mob)
-                            if mobId and isAlive(mob) then
-                                currentTarget = mob
-                                currentTargetId = mobId
-                                break
-                            end
-                        end
+                -- Update daftar mobs
+                mobsList = {}
+                for _, mob in pairs(mobsFolder:GetChildren()) do
+                    if mob:IsA("Model") then
+                        table.insert(mobsList, mob)
                     end
                 end
                 
-                -- Jika ada target, tween dan serang
-                if currentTarget and currentTargetId then
-                    -- Update status di GUI
-                    if guiElements then
-                        guiElements.targetLabel.Text = "🎯 " .. currentTarget.Name
+                if #mobsList > 0 then
+                    -- Reset index jika melebihi
+                    if currentIndex > #mobsList then
+                        currentIndex = 1
                     end
                     
-                    -- Tween ke target
-                    tweenToModel(currentTarget)
-                    
-                    -- Serang sampai mati
-                    while AutoMobs and currentTarget and isAlive(currentTarget) do
-                        hitMob(currentTargetId)
-                        task.wait(CONFIG.AttackSpeed)
+                    local target = mobsList[currentIndex]
+                    if target then
+                        -- Update GUI
+                        if guiElements then
+                            guiElements.targetLabel.Text = "🎯 " .. target.Name .. " (" .. currentIndex .. "/" .. #mobsList .. ")"
+                        end
+                        
+                        print("📍 Tween ke: " .. target.Name)
+                        tweenToModel(target)
+                        
+                        -- Pindah ke mob berikutnya
+                        currentIndex = currentIndex + 1
+                        task.wait(0.5)
+                    end
+                else
+                    if guiElements then
+                        guiElements.targetLabel.Text = "🎯 Tidak ada mob"
                     end
                 end
             end
         end
         
-        -- Scan setiap 0.5 detik
         task.wait(CONFIG.ScanDelay)
-    end
-end)
-
--- ========== AUTO CONVERT SP ==========
-task.spawn(function()
-    while true do
-        if AutoConvertSP and convertSPRemote then
-            pcall(function()
-                if convertSPRemote.ClassName == "RemoteFunction" then
-                    convertSPRemote:InvokeServer(CONFIG.ConvertAmount)
-                else
-                    convertSPRemote:FireServer(CONFIG.ConvertAmount)
-                end
-            end)
-        end
-        task.wait(CONFIG.ConvertDelay)
     end
 end)
 
@@ -290,7 +177,7 @@ screenGui.ResetOnSpawn = false
 screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
 local Main = Instance.new("Frame")
-Main.Size = UDim2.new(0, 300, 0, 460)
+Main.Size = UDim2.new(0, 300, 0, 400)
 Main.Position = UDim2.new(0.5, -150, 0.15, 0)
 Main.BackgroundColor3 = Color3.fromRGB(8, 6, 15)
 Main.BackgroundTransparency = 0.05
@@ -425,53 +312,53 @@ TabRaidCorner.Parent = TabRaid
 
 -- ========== CONTENT MAIN ==========
 local ContentMain = Instance.new("Frame")
-ContentMain.Size = UDim2.new(1, -20, 0, 320)
+ContentMain.Size = UDim2.new(1, -20, 0, 260)
 ContentMain.Position = UDim2.new(0, 10, 0, 95)
 ContentMain.BackgroundTransparency = 1
 ContentMain.Visible = true
 ContentMain.Parent = Main
 
--- Auto Mobs Card
-local MobsFrame = Instance.new("Frame")
-MobsFrame.Size = UDim2.new(1, 0, 0, 70)
-MobsFrame.BackgroundColor3 = Color3.fromRGB(18, 16, 32)
-MobsFrame.BackgroundTransparency = 0.2
-MobsFrame.BorderSizePixel = 0
-MobsFrame.Parent = ContentMain
+-- Auto Tween Card
+local TweenFrame = Instance.new("Frame")
+TweenFrame.Size = UDim2.new(1, 0, 0, 100)
+TweenFrame.BackgroundColor3 = Color3.fromRGB(18, 16, 32)
+TweenFrame.BackgroundTransparency = 0.2
+TweenFrame.BorderSizePixel = 0
+TweenFrame.Parent = ContentMain
 
-local MobsCorner = Instance.new("UICorner")
-MobsCorner.CornerRadius = UDim.new(0, 8)
-MobsCorner.Parent = MobsFrame
+local TweenCorner = Instance.new("UICorner")
+TweenCorner.CornerRadius = UDim.new(0, 8)
+TweenCorner.Parent = TweenFrame
 
-local MobsIcon = Instance.new("TextLabel")
-MobsIcon.Size = UDim2.new(0, 45, 1, 0)
-MobsIcon.BackgroundTransparency = 1
-MobsIcon.Text = "👾"
-MobsIcon.TextColor3 = Color3.fromRGB(255, 100, 100)
-MobsIcon.TextSize = 28
-MobsIcon.Parent = MobsFrame
+local TweenIcon = Instance.new("TextLabel")
+TweenIcon.Size = UDim2.new(0, 45, 1, 0)
+TweenIcon.BackgroundTransparency = 1
+TweenIcon.Text = "🏃"
+TweenIcon.TextColor3 = Color3.fromRGB(100, 200, 255)
+TweenIcon.TextSize = 28
+TweenIcon.Parent = TweenFrame
 
-local MobsLabel = Instance.new("TextLabel")
-MobsLabel.Size = UDim2.new(0.5, 0, 0, 20)
-MobsLabel.Position = UDim2.new(0, 55, 0, 12)
-MobsLabel.BackgroundTransparency = 1
-MobsLabel.Text = "Auto Mobs"
-MobsLabel.TextColor3 = Color3.fromRGB(220, 220, 240)
-MobsLabel.Font = Enum.Font.FredokaOne
-MobsLabel.TextSize = 14
-MobsLabel.TextXAlignment = Enum.TextXAlignment.Left
-MobsLabel.Parent = MobsFrame
+local TweenLabel = Instance.new("TextLabel")
+TweenLabel.Size = UDim2.new(0.5, 0, 0, 20)
+TweenLabel.Position = UDim2.new(0, 55, 0, 12)
+TweenLabel.BackgroundTransparency = 1
+TweenLabel.Text = "Auto Tween"
+TweenLabel.TextColor3 = Color3.fromRGB(220, 220, 240)
+TweenLabel.Font = Enum.Font.FredokaOne
+TweenLabel.TextSize = 14
+TweenLabel.TextXAlignment = Enum.TextXAlignment.Left
+TweenLabel.Parent = TweenFrame
 
-local MobsDesc = Instance.new("TextLabel")
-MobsDesc.Size = UDim2.new(0.5, 0, 0, 14)
-MobsDesc.Position = UDim2.new(0, 55, 0, 32)
-MobsDesc.BackgroundTransparency = 1
-MobsDesc.Text = "Scan 0.5 detik | Fokus 1 target"
-MobsDesc.TextColor3 = Color3.fromRGB(150, 150, 200)
-MobsDesc.Font = Enum.Font.Gotham
-MobsDesc.TextSize = 9
-MobsDesc.TextXAlignment = Enum.TextXAlignment.Left
-MobsDesc.Parent = MobsFrame
+local TweenDesc = Instance.new("TextLabel")
+TweenDesc.Size = UDim2.new(0.5, 0, 0, 14)
+TweenDesc.Position = UDim2.new(0, 55, 0, 32)
+TweenDesc.BackgroundTransparency = 1
+TweenDesc.Text = "Tween ke model di folder Mobs"
+TweenDesc.TextColor3 = Color3.fromRGB(150, 150, 200)
+TweenDesc.Font = Enum.Font.Gotham
+TweenDesc.TextSize = 9
+TweenDesc.TextXAlignment = Enum.TextXAlignment.Left
+TweenDesc.Parent = TweenFrame
 
 local targetLabel = Instance.new("TextLabel")
 targetLabel.Size = UDim2.new(0.5, 0, 0, 14)
@@ -482,74 +369,27 @@ targetLabel.TextColor3 = Color3.fromRGB(255, 200, 100)
 targetLabel.Font = Enum.Font.Gotham
 targetLabel.TextSize = 10
 targetLabel.TextXAlignment = Enum.TextXAlignment.Left
-targetLabel.Parent = MobsFrame
+targetLabel.Parent = TweenFrame
 
-local MobsBtn = Instance.new("TextButton")
-MobsBtn.Size = UDim2.new(0, 65, 0, 32)
-MobsBtn.Position = UDim2.new(1, -75, 0.5, -16)
-MobsBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
-MobsBtn.Text = "OFF"
-MobsBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-MobsBtn.Font = Enum.Font.GothamBold
-MobsBtn.TextSize = 12
-MobsBtn.BorderSizePixel = 0
-MobsBtn.Parent = MobsFrame
+local TweenBtn = Instance.new("TextButton")
+TweenBtn.Size = UDim2.new(0, 65, 0, 32)
+TweenBtn.Position = UDim2.new(1, -75, 0.5, -16)
+TweenBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+TweenBtn.Text = "OFF"
+TweenBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+TweenBtn.Font = Enum.Font.GothamBold
+TweenBtn.TextSize = 12
+TweenBtn.BorderSizePixel = 0
+TweenBtn.Parent = TweenFrame
 
-local MobsBtnCorner = Instance.new("UICorner")
-MobsBtnCorner.CornerRadius = UDim.new(0, 6)
-MobsBtnCorner.Parent = MobsBtn
-
--- Auto Convert SP Card
-local ConvertFrame = Instance.new("Frame")
-ConvertFrame.Size = UDim2.new(1, 0, 0, 60)
-ConvertFrame.Position = UDim2.new(0, 0, 0, 80)
-ConvertFrame.BackgroundColor3 = Color3.fromRGB(18, 16, 32)
-ConvertFrame.BackgroundTransparency = 0.2
-ConvertFrame.BorderSizePixel = 0
-ConvertFrame.Parent = ContentMain
-
-local ConvertCorner = Instance.new("UICorner")
-ConvertCorner.CornerRadius = UDim.new(0, 8)
-ConvertCorner.Parent = ConvertFrame
-
-local ConvertIcon = Instance.new("TextLabel")
-ConvertIcon.Size = UDim2.new(0, 45, 1, 0)
-ConvertIcon.BackgroundTransparency = 1
-ConvertIcon.Text = "✨"
-ConvertIcon.TextColor3 = Color3.fromRGB(100, 255, 200)
-ConvertIcon.TextSize = 28
-ConvertIcon.Parent = ConvertFrame
-
-local ConvertLabel = Instance.new("TextLabel")
-ConvertLabel.Size = UDim2.new(0.5, 0, 0, 20)
-ConvertLabel.Position = UDim2.new(0, 55, 0, 20)
-ConvertLabel.BackgroundTransparency = 1
-ConvertLabel.Text = "Auto Convert SP"
-ConvertLabel.TextColor3 = Color3.fromRGB(220, 220, 240)
-ConvertLabel.Font = Enum.Font.FredokaOne
-ConvertLabel.TextSize = 13
-ConvertLabel.TextXAlignment = Enum.TextXAlignment.Left
-ConvertLabel.Parent = ConvertFrame
-
-local ConvertBtn = Instance.new("TextButton")
-ConvertBtn.Size = UDim2.new(0, 65, 0, 32)
-ConvertBtn.Position = UDim2.new(1, -75, 0.5, -16)
-ConvertBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
-ConvertBtn.Text = "OFF"
-ConvertBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-ConvertBtn.Font = Enum.Font.GothamBold
-ConvertBtn.TextSize = 12
-ConvertBtn.BorderSizePixel = 0
-ConvertBtn.Parent = ConvertFrame
-
-local ConvertBtnCorner = Instance.new("UICorner")
-ConvertBtnCorner.CornerRadius = UDim.new(0, 6)
-ConvertBtnCorner.Parent = ConvertBtn
+local TweenBtnCorner = Instance.new("UICorner")
+TweenBtnCorner.CornerRadius = UDim.new(0, 6)
+TweenBtnCorner.Parent = TweenBtn
 
 -- Info Card
 local InfoFrame = Instance.new("Frame")
-InfoFrame.Size = UDim2.new(1, 0, 0, 60)
-InfoFrame.Position = UDim2.new(0, 0, 0, 155)
+InfoFrame.Size = UDim2.new(1, 0, 0, 80)
+InfoFrame.Position = UDim2.new(0, 0, 0, 115)
 InfoFrame.BackgroundColor3 = Color3.fromRGB(18, 16, 32)
 InfoFrame.BackgroundTransparency = 0.2
 InfoFrame.BorderSizePixel = 0
@@ -582,7 +422,7 @@ local InfoDesc = Instance.new("TextLabel")
 InfoDesc.Size = UDim2.new(0.7, 0, 0, 14)
 InfoDesc.Position = UDim2.new(0, 55, 0, 28)
 InfoDesc.BackgroundTransparency = 1
-InfoDesc.Text = "Auto Mobs: Scan semua model di Mobs"
+InfoDesc.Text = "Scan semua model di folder Mobs"
 InfoDesc.TextColor3 = Color3.fromRGB(150, 150, 200)
 InfoDesc.Font = Enum.Font.Gotham
 InfoDesc.TextSize = 9
@@ -593,16 +433,27 @@ local InfoDesc2 = Instance.new("TextLabel")
 InfoDesc2.Size = UDim2.new(0.7, 0, 0, 14)
 InfoDesc2.Position = UDim2.new(0, 55, 0, 42)
 InfoDesc2.BackgroundTransparency = 1
-InfoDesc2.Text = "Scan interval: 0.5 detik"
+InfoDesc2.Text = "Tween nempel ke setiap model"
 InfoDesc2.TextColor3 = Color3.fromRGB(150, 150, 200)
 InfoDesc2.Font = Enum.Font.Gotham
 InfoDesc2.TextSize = 9
 InfoDesc2.TextXAlignment = Enum.TextXAlignment.Left
 InfoDesc2.Parent = InfoFrame
 
+local InfoDesc3 = Instance.new("TextLabel")
+InfoDesc3.Size = UDim2.new(0.7, 0, 0, 14)
+InfoDesc3.Position = UDim2.new(0, 55, 0, 56)
+InfoDesc3.BackgroundTransparency = 1
+InfoDesc3.Text = "Scan interval: 0.5 detik"
+InfoDesc3.TextColor3 = Color3.fromRGB(150, 150, 200)
+InfoDesc3.Font = Enum.Font.Gotham
+InfoDesc3.TextSize = 9
+InfoDesc3.TextXAlignment = Enum.TextXAlignment.Left
+InfoDesc3.Parent = InfoFrame
+
 -- ========== CONTENT TELEPORT ==========
 local ContentTeleport = Instance.new("ScrollingFrame")
-ContentTeleport.Size = UDim2.new(1, -20, 0, 320)
+ContentTeleport.Size = UDim2.new(1, -20, 0, 260)
 ContentTeleport.Position = UDim2.new(0, 10, 0, 95)
 ContentTeleport.BackgroundTransparency = 1
 ContentTeleport.ScrollBarThickness = 3
@@ -652,7 +503,7 @@ end
 
 -- ========== CONTENT RAID ==========
 local ContentRaid = Instance.new("ScrollingFrame")
-ContentRaid.Size = UDim2.new(1, -20, 0, 320)
+ContentRaid.Size = UDim2.new(1, -20, 0, 260)
 ContentRaid.Position = UDim2.new(0, 10, 0, 95)
 ContentRaid.BackgroundTransparency = 1
 ContentRaid.ScrollBarThickness = 3
@@ -735,21 +586,26 @@ guiElements = {
     targetLabel = targetLabel
 }
 
--- Update target label
+-- Update target label setiap 0.5 detik
 task.spawn(function()
     while true do
-        if guiElements and guiElements.targetLabel and AutoMobs then
+        if guiElements and guiElements.targetLabel and AutoTween then
             local mobsFolder = workspace:FindFirstChild("Mobs")
             if mobsFolder then
+                local firstMob = nil
                 for _, mob in pairs(mobsFolder:GetChildren()) do
                     if mob:IsA("Model") then
-                        local humanoid = mob:FindFirstChild("Humanoid")
-                        if humanoid and humanoid.Health > 0 then
-                            guiElements.targetLabel.Text = "🎯 Target: " .. mob.Name
-                            break
-                        end
+                        firstMob = mob
+                        break
                     end
                 end
+                if firstMob then
+                    guiElements.targetLabel.Text = "🎯 Target: " .. firstMob.Name
+                else
+                    guiElements.targetLabel.Text = "🎯 Target: -"
+                end
+            else
+                guiElements.targetLabel.Text = "🎯 Target: -"
             end
         elseif guiElements and guiElements.targetLabel then
             guiElements.targetLabel.Text = "🎯 Target: -"
@@ -798,29 +654,18 @@ TabMain.MouseButton1Click:Connect(function() switchTab("MAIN") end)
 TabTeleport.MouseButton1Click:Connect(function() switchTab("TELEPORT") end)
 TabRaid.MouseButton1Click:Connect(function() switchTab("RAID") end)
 
--- ========== TOGGLE FUNCTIONS ==========
-MobsBtn.MouseButton1Click:Connect(function()
-    AutoMobs = not AutoMobs
-    if AutoMobs then
-        MobsBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
-        MobsBtn.Text = "ON"
+-- ========== TOGGLE FUNCTION ==========
+TweenBtn.MouseButton1Click:Connect(function()
+    AutoTween = not AutoTween
+    if AutoTween then
+        TweenBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+        TweenBtn.Text = "ON"
     else
-        MobsBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
-        MobsBtn.Text = "OFF"
+        TweenBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+        TweenBtn.Text = "OFF"
         if guiElements then
             guiElements.targetLabel.Text = "🎯 Target: -"
         end
-    end
-end)
-
-ConvertBtn.MouseButton1Click:Connect(function()
-    AutoConvertSP = not AutoConvertSP
-    if AutoConvertSP then
-        ConvertBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
-        ConvertBtn.Text = "ON"
-    else
-        ConvertBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
-        ConvertBtn.Text = "OFF"
     end
 end)
 
@@ -837,7 +682,7 @@ MinBtn.MouseButton1Click:Connect(function()
         ContentRaid.Visible = false
         MinBtn.Text = "+"
     else
-        Main.Size = UDim2.new(0, 300, 0, 460)
+        Main.Size = UDim2.new(0, 300, 0, 400)
         TabMain.Visible = true
         TabTeleport.Visible = true
         TabRaid.Visible = true
@@ -853,19 +698,17 @@ MinBtn.MouseButton1Click:Connect(function()
 end)
 
 CloseBtn.MouseButton1Click:Connect(function()
-    AutoMobs = false
-    AutoConvertSP = false
+    AutoTween = false
     screenGui:Destroy()
 end)
 
 print("═══════════════════════════════════════════")
 print("   ZAIXPLOIT | MELEE RNG")
 print("═══════════════════════════════════════════")
-print("✅ Auto Mobs (Scan 0.5 detik)")
+print("✅ Auto Tween")
 print("   → Scan semua model di folder Mobs")
-print("   → Fokus 1 target sampai mati")
-print("   → Langsung pindah ke target berikutnya")
-print("✅ Auto Convert SP (Loop 0.03 detik)")
+print("   → Tween nempel ke setiap model")
+print("   → Scan interval: 0.5 detik")
 print("✅ TELEPORT → SPAWNS biasa")
 print("✅ RAID → BossRaidArea")
 print("✅ Anti AFK Active")
