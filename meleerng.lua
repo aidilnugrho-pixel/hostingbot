@@ -15,17 +15,17 @@ local selectedFarmZone = "Grassland"
 
 -- Config
 local CONFIG = {
-    WaitTime = 60,
-    IdleTime = 2,
     ConvertDelay = 0.03,
-    ConvertAmount = 30,
+    ConvertAmount = 1,
     AscendInterval = 60,
-    TweenSpeed = 0.3,
-    AttackSpeed = 0.1
+    AttackSpeed = 0.1,
+    RaidWait = 60,
+    RaidIdle = 2
 }
 
 -- ========== ZONE LIST ==========
-local allZones = {
+-- Untuk Auto Farm (9 zone termasuk Galactic)
+local farmZones = {
     {name = "Grassland", icon = "🌿"},
     {name = "Desert Biome", icon = "🏜️"},
     {name = "Jungle Biome", icon = "🌴"},
@@ -35,6 +35,31 @@ local allZones = {
     {name = "Shadow Realm", icon = "🌑"},
     {name = "Forgotten Valley", icon = "🏔️"},
     {name = "Galactic Outpost", icon = "🚀"}
+}
+
+-- Untuk Teleport (9 zone termasuk Galactic)
+local teleportZones = {
+    {name = "Grassland", icon = "🌿"},
+    {name = "Desert Biome", icon = "🏜️"},
+    {name = "Jungle Biome", icon = "🌴"},
+    {name = "Snow Biome", icon = "❄️"},
+    {name = "Volcano Island", icon = "🌋"},
+    {name = "Shadow Dungeon", icon = "👻"},
+    {name = "Shadow Realm", icon = "🌑"},
+    {name = "Forgotten Valley", icon = "🏔️"},
+    {name = "Galactic Outpost", icon = "🚀"}
+}
+
+-- Untuk RAID (8 zone, TANPA Galactic)
+local raidZones = {
+    {name = "Grassland", icon = "🌿"},
+    {name = "Desert Biome", icon = "🏜️"},
+    {name = "Jungle Biome", icon = "🌴"},
+    {name = "Snow Biome", icon = "❄️"},
+    {name = "Volcano Island", icon = "🌋"},
+    {name = "Shadow Dungeon", icon = "👻"},
+    {name = "Shadow Realm", icon = "🌑"},
+    {name = "Forgotten Valley", icon = "🏔️"}
 }
 
 -- ========== REMOTE ==========
@@ -105,6 +130,39 @@ local function teleportToSpawn(zoneName)
     if not rootPart then return end
     
     rootPart.CFrame = CFrame.new(targetPart.Position)
+    print("✅ Teleport ke " .. zoneName)
+end
+
+-- ========== FUNGSI TELEPORT KE RAID ==========
+local function teleportToRaid(zoneName)
+    local areas = workspace:FindFirstChild("Areas")
+    if not areas then return false end
+    local area = areas:FindFirstChild(zoneName)
+    if not area then return false end
+    local raidArea = area:FindFirstChild("BossRaidArea")
+    if not raidArea then return false end
+    
+    local targetPart = nil
+    if raidArea:IsA("BasePart") then
+        targetPart = raidArea
+    else
+        for _, part in pairs(raidArea:GetChildren()) do
+            if part:IsA("BasePart") then
+                targetPart = part
+                break
+            end
+        end
+    end
+    if not targetPart then return false end
+    
+    local char = LocalPlayer.Character
+    if not char then return false end
+    local rootPart = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Head")
+    if not rootPart then return false end
+    
+    rootPart.CFrame = CFrame.new(targetPart.Position)
+    print("📍 RAID Teleport ke: " .. zoneName)
+    return true
 end
 
 -- ========== FUNGSI AUTO FARM ==========
@@ -119,20 +177,6 @@ local function getMobHp(mob)
     local humanoid = mob:FindFirstChild("Humanoid")
     if humanoid then return humanoid.Health end
     return 0
-end
-
-local function tweenToModel(model)
-    local char = LocalPlayer.Character
-    if not char then return false end
-    local rootPart = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Head")
-    if not rootPart then return false end
-    local targetPart = model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("Head") or model:FindFirstChildWhichIsA("BasePart")
-    if not targetPart then return false end
-    local targetPos = targetPart.Position + Vector3.new(2, 0, 2)
-    local tween = TweenService:Create(rootPart, TweenInfo.new(CONFIG.TweenSpeed, Enum.EasingStyle.Quad), {CFrame = CFrame.new(targetPos)})
-    tween:Play()
-    tween.Completed:Wait()
-    return true
 end
 
 local function hitMob(mobId)
@@ -187,23 +231,21 @@ local function getMobWithMostHp()
     return bestMob, bestHp
 end
 
--- Loop Auto Farm (freeze di zone, kill terus)
+-- Loop Auto Farm (FREEZE, tanpa tween/gerak)
 local farmRunning = false
 local function startAutoFarm()
     if farmRunning then return end
     farmRunning = true
     
     task.spawn(function()
-        -- Teleport ke zone yang dipilih
         teleportToSpawn(selectedFarmZone)
-        print("📍 Auto Farm di: " .. selectedFarmZone)
+        print("⚔️ AUTO FARM di: " .. selectedFarmZone .. " (FREEZE MODE)")
         
         while AutoFarm do
             if hasAliveMobs() then
-                local target, targetHp = getMobWithMostHp()
+                local target = getMobWithMostHp()
                 if target then
                     local mobId = getMobId(target)
-                    tweenToModel(target)
                     while AutoFarm and target and target.Parent and isAlive(target) do
                         hitMob(mobId)
                         task.wait(CONFIG.AttackSpeed)
@@ -242,6 +284,7 @@ task.spawn(function()
                 else
                     ascendRemote:FireServer()
                 end
+                print("⬆️ Auto Ascend")
             end)
         end
         task.wait(CONFIG.AscendInterval)
@@ -259,9 +302,7 @@ local function runInstanKill()
         local func, err = loadstring(result)
         if func then
             pcall(func)
-            if guiElements and guiElements.instanKillStatus then
-                guiElements.instanKillStatus.Text = "✅"
-            end
+            print("💀 Instan Kill: RUNNING")
         end
     end
 end
@@ -280,7 +321,7 @@ screenGui.ResetOnSpawn = false
 screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
 local Main = Instance.new("Frame")
-Main.Size = UDim2.new(0, 300, 0, 350)
+Main.Size = UDim2.new(0, 300, 0, 300)
 Main.Position = UDim2.new(0.5, -150, 0.2, 0)
 Main.BackgroundColor3 = Color3.fromRGB(8, 6, 15)
 Main.BackgroundTransparency = 0.05
@@ -367,7 +408,7 @@ local CloseCorner = Instance.new("UICorner")
 CloseCorner.CornerRadius = UDim.new(0, 4)
 CloseCorner.Parent = CloseBtn
 
--- Tab Buttons (MENU kiri, TELEPORT tengah, RAID kanan)
+-- Tab Buttons
 local TabMenu = Instance.new("TextButton")
 TabMenu.Size = UDim2.new(0, 65, 0, 30)
 TabMenu.Position = UDim2.new(0, 10, 0, 50)
@@ -415,13 +456,13 @@ TabRaidCorner.Parent = TabRaid
 
 -- ========== CONTENT MENU ==========
 local ContentMenu = Instance.new("Frame")
-ContentMenu.Size = UDim2.new(1, -20, 0, 240)
+ContentMenu.Size = UDim2.new(1, -20, 0, 190)
 ContentMenu.Position = UDim2.new(0, 10, 0, 90)
 ContentMenu.BackgroundTransparency = 1
 ContentMenu.Visible = true
 ContentMenu.Parent = Main
 
--- ========== AUTO FARM (Baris 1) ==========
+-- Auto Farm
 local farmFrame = Instance.new("Frame")
 farmFrame.Size = UDim2.new(1, 0, 0, 35)
 farmFrame.BackgroundTransparency = 1
@@ -437,7 +478,6 @@ farmLabel.TextSize = 12
 farmLabel.TextXAlignment = Enum.TextXAlignment.Left
 farmLabel.Parent = farmFrame
 
--- Dropdown
 local farmDropdown = Instance.new("TextButton")
 farmDropdown.Size = UDim2.new(0, 120, 0, 28)
 farmDropdown.Position = UDim2.new(0.28, 0, 0.5, -14)
@@ -453,7 +493,6 @@ local farmDropdownCorner = Instance.new("UICorner")
 farmDropdownCorner.CornerRadius = UDim.new(0, 5)
 farmDropdownCorner.Parent = farmDropdown
 
--- Toggle ON/OFF
 local farmToggle = Instance.new("TextButton")
 farmToggle.Size = UDim2.new(0, 50, 0, 26)
 farmToggle.Position = UDim2.new(1, -55, 0.5, -13)
@@ -501,7 +540,7 @@ local function openDropdown()
     layout.Padding = UDim.new(0, 2)
     layout.Parent = dropdownFrame
     
-    for _, zone in pairs(allZones) do
+    for _, zone in pairs(farmZones) do
         local btn = Instance.new("TextButton")
         btn.Size = UDim2.new(1, 0, 0, 24)
         btn.BackgroundColor3 = Color3.fromRGB(30, 30, 50)
@@ -532,7 +571,6 @@ farmDropdown.MouseButton1Click:Connect(function()
     end
 end)
 
--- Farm toggle function
 farmToggle.MouseButton1Click:Connect(function()
     AutoFarm = not AutoFarm
     if AutoFarm then
@@ -545,7 +583,7 @@ farmToggle.MouseButton1Click:Connect(function()
     end
 end)
 
--- ========== INSTAN KILL ==========
+-- Instan Kill
 local killFrame = Instance.new("Frame")
 killFrame.Size = UDim2.new(1, 0, 0, 35)
 killFrame.Position = UDim2.new(0, 0, 0, 45)
@@ -577,17 +615,7 @@ local killBtnCorner = Instance.new("UICorner")
 killBtnCorner.CornerRadius = UDim.new(0, 5)
 killBtnCorner.Parent = killBtn
 
-local killStatus = Instance.new("TextLabel")
-killStatus.Size = UDim2.new(0, 30, 0, 14)
-killStatus.Position = UDim2.new(1, -95, 0.5, -7)
-killStatus.BackgroundTransparency = 1
-killStatus.Text = ""
-killStatus.TextColor3 = Color3.fromRGB(100, 255, 100)
-killStatus.Font = Enum.Font.Gotham
-killStatus.TextSize = 8
-killStatus.Parent = killFrame
-
--- ========== CONVERT SP ==========
+-- Convert SP
 local convertFrame = Instance.new("Frame")
 convertFrame.Size = UDim2.new(1, 0, 0, 35)
 convertFrame.Position = UDim2.new(0, 0, 0, 90)
@@ -619,7 +647,7 @@ local convertToggleCorner = Instance.new("UICorner")
 convertToggleCorner.CornerRadius = UDim.new(0, 5)
 convertToggleCorner.Parent = convertToggle
 
--- ========== AUTO ASCEND ==========
+-- Auto Ascend
 local ascendFrame = Instance.new("Frame")
 ascendFrame.Size = UDim2.new(1, 0, 0, 35)
 ascendFrame.Position = UDim2.new(0, 0, 0, 135)
@@ -653,7 +681,7 @@ ascendToggleCorner.Parent = ascendToggle
 
 -- ========== CONTENT TELEPORT ==========
 local ContentTeleport = Instance.new("ScrollingFrame")
-ContentTeleport.Size = UDim2.new(1, -20, 0, 240)
+ContentTeleport.Size = UDim2.new(1, -20, 0, 190)
 ContentTeleport.Position = UDim2.new(0, 10, 0, 90)
 ContentTeleport.BackgroundTransparency = 1
 ContentTeleport.ScrollBarThickness = 3
@@ -667,7 +695,7 @@ TeleportLayout.Padding = UDim.new(0, 5)
 TeleportLayout.SortOrder = Enum.SortOrder.LayoutOrder
 TeleportLayout.Parent = ContentTeleport
 
-for _, zone in pairs(allZones) do
+for _, zone in pairs(teleportZones) do
     local frame = Instance.new("Frame")
     frame.Size = UDim2.new(1, 0, 0, 32)
     frame.BackgroundTransparency = 1
@@ -705,7 +733,7 @@ end
 
 -- ========== CONTENT RAID ==========
 local ContentRaid = Instance.new("ScrollingFrame")
-ContentRaid.Size = UDim2.new(1, -20, 0, 240)
+ContentRaid.Size = UDim2.new(1, -20, 0, 190)
 ContentRaid.Position = UDim2.new(0, 10, 0, 90)
 ContentRaid.BackgroundTransparency = 1
 ContentRaid.ScrollBarThickness = 3
@@ -719,20 +747,10 @@ RaidLayout.Padding = UDim.new(0, 5)
 RaidLayout.SortOrder = Enum.SortOrder.LayoutOrder
 RaidLayout.Parent = ContentRaid
 
--- Zone RAID (sama tapi tanpa teleport, hanya toggle)
-local raidZoneList = {
-    {name = "Grassland", icon = "🌿", enabled = false},
-    {name = "Desert Biome", icon = "🏜️", enabled = false},
-    {name = "Jungle Biome", icon = "🌴", enabled = false},
-    {name = "Snow Biome", icon = "❄️", enabled = false},
-    {name = "Volcano Island", icon = "🌋", enabled = false},
-    {name = "Shadow Dungeon", icon = "👻", enabled = false},
-    {name = "Shadow Realm", icon = "🌑", enabled = false},
-    {name = "Forgotten Valley", icon = "🏔️", enabled = false},
-    {name = "Galactic Outpost", icon = "🚀", enabled = false}
-}
+-- Variabel untuk menyimpan task RAID
+local raidTasks = {}
 
-for _, zone in pairs(raidZoneList) do
+for _, zone in pairs(raidZones) do
     local frame = Instance.new("Frame")
     frame.Size = UDim2.new(1, 0, 0, 30)
     frame.BackgroundTransparency = 1
@@ -763,34 +781,68 @@ for _, zone in pairs(raidZoneList) do
     toggleCorner.CornerRadius = UDim.new(0, 4)
     toggleCorner.Parent = toggle
     
+    -- Status label (menampilkan timer)
+    local statusLabel = Instance.new("TextLabel")
+    statusLabel.Size = UDim2.new(0, 40, 0, 14)
+    statusLabel.Position = UDim2.new(1, -110, 0.5, -7)
+    statusLabel.BackgroundTransparency = 1
+    statusLabel.Text = ""
+    statusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+    statusLabel.Font = Enum.Font.Gotham
+    statusLabel.TextSize = 8
+    statusLabel.Parent = frame
+    
     toggle.MouseButton1Click:Connect(function()
         zone.enabled = not zone.enabled
         if zone.enabled then
             toggle.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
             toggle.Text = "ON"
+            statusLabel.Text = "▶"
+            
+            -- Loop RAID
+            local raidTask = task.spawn(function()
+                while zone.enabled do
+                    -- Teleport ke BossRaidArea
+                    local success = teleportToRaid(zone.name)
+                    if success then
+                        statusLabel.Text = "⏳60s"
+                        
+                        -- Tunggu 60 detik
+                        for i = CONFIG.RaidWait, 1, -1 do
+                            if not zone.enabled then break end
+                            statusLabel.Text = "⏳" .. i .. "s"
+                            task.wait(1)
+                        end
+                        if not zone.enabled then break end
+                        
+                        -- Idle 2 detik
+                        statusLabel.Text = "⏸️2s"
+                        task.wait(CONFIG.RaidIdle)
+                    else
+                        statusLabel.Text = "❌"
+                        task.wait(5)
+                    end
+                end
+                statusLabel.Text = ""
+            end)
+            raidTasks[zone.name] = raidTask
         else
             toggle.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
             toggle.Text = "OFF"
+            statusLabel.Text = ""
+            if raidTasks[zone.name] then
+                task.cancel(raidTasks[zone.name])
+                raidTasks[zone.name] = nil
+            end
         end
     end)
 end
 
--- ========== GUI ELEMENTS ==========
-guiElements = {
-    instanKillStatus = killStatus
-}
-
--- ========== FUNGSI ==========
+-- ========== FUNGSI TOGGLE ==========
 killBtn.MouseButton1Click:Connect(function()
     if not instanKillLoaded then
         instanKillLoaded = true
-        killStatus.Text = "⏳"
-        task.spawn(function()
-            runInstanKill()
-            killStatus.Text = "✅"
-            task.wait(2)
-            killStatus.Text = ""
-        end)
+        task.spawn(runInstanKill)
     end
 end)
 
@@ -869,7 +921,7 @@ MinBtn.MouseButton1Click:Connect(function()
         ContentRaid.Visible = false
         MinBtn.Text = "+"
     else
-        Main.Size = UDim2.new(0, 300, 0, 350)
+        Main.Size = UDim2.new(0, 300, 0, 300)
         TabMenu.Visible = true
         TabTeleport.Visible = true
         TabRaid.Visible = true
@@ -888,16 +940,19 @@ CloseBtn.MouseButton1Click:Connect(function()
     AutoFarm = false
     ConvertSP = false
     AutoAscend = false
+    for _, taskId in pairs(raidTasks) do
+        task.cancel(taskId)
+    end
     screenGui:Destroy()
 end)
 
 print("═══════════════════════════════════════════")
 print("   ZAIXPLOIT | MELEE RNG")
 print("═══════════════════════════════════════════")
-print("⚔️ AUTO FARM - Pilih map, freeze, auto kill")
+print("⚔️ AUTO FARM - Pilih map, FREEZE, auto kill (9 Zone)")
 print("💀 INSTAN KILL - Tombol RUN")
-print("✨ CONVERT SP - Auto convert")
+print("✨ CONVERT SP - Auto convert (Amount: 1)")
 print("⬆️ AUTO ASCEND - Setiap 60 detik")
-print("📍 TELEPORT - Ke SPAWNS")
-print("⚔️ RAID - Teleport loop ke BossRaidArea")
+print("📍 TELEPORT - Ke SPAWNS (9 Zone termasuk Galactic)")
+print("⚔️ RAID - Teleport → 60s → idle 2s → loop (8 Zone, TANPA Galactic)")
 print("═══════════════════════════════════════════")
