@@ -15,7 +15,8 @@ local CONFIG = {
     TweenSpeed = 0.3,
     AttackSpeed = 0.1,
     ConvertAmount = 30,
-    ConvertDelay = 0.03
+    ConvertDelay = 0.03,
+    ScanDelay = 0.5 -- Scan setiap 0.5 detik
 }
 
 -- ========== DATA ZONE ==========
@@ -168,7 +169,7 @@ local function teleportToRaid(zoneName)
     print("✅ Teleport ke " .. zoneName .. " [RAID]")
 end
 
--- ========== FUNGSI AUTO MOBS ==========
+-- ========== FUNGSI AUTO MOBS (SCAN 0.5 DETIK) ==========
 local function getMobId(mob)
     local attrs = mob:GetAttributes()
     if attrs.ID then return attrs.ID end
@@ -178,15 +179,16 @@ end
 
 local function tweenToModel(model)
     local char = LocalPlayer.Character
-    if not char then return end
+    if not char then return false end
     local rootPart = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Head")
-    if not rootPart then return end
+    if not rootPart then return false end
     local targetPart = model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("Head") or model:FindFirstChildWhichIsA("BasePart")
-    if not targetPart then return end
+    if not targetPart then return false end
     local targetPos = targetPart.Position + Vector3.new(2, 0, 2)
     local tween = TweenService:Create(rootPart, TweenInfo.new(CONFIG.TweenSpeed, Enum.EasingStyle.Quad), {CFrame = CFrame.new(targetPos)})
     tween:Play()
     tween.Completed:Wait()
+    return true
 end
 
 local function hitMob(mobId)
@@ -201,44 +203,60 @@ local function hitMob(mobId)
 end
 
 local function isAlive(model)
-    local humanoid = model and model:FindFirstChild("Humanoid")
+    if not model or not model.Parent then return false end
+    local humanoid = model:FindFirstChild("Humanoid")
     return humanoid and humanoid.Health > 0
 end
 
--- Loop Auto Mobs (Fokus 1 model sampai mati, baru pindah)
+-- Loop Auto Mobs (scan setiap 0.5 detik, fokus 1 target sampai mati)
 task.spawn(function()
+    local currentTarget = nil
+    local currentTargetId = nil
+    
     while true do
         if AutoMobs then
             local mobsFolder = workspace:FindFirstChild("Mobs")
+            
             if mobsFolder then
-                -- Cari model hidup pertama
-                local targetMob = nil
-                local targetId = nil
-                
-                for _, mob in pairs(mobsFolder:GetChildren()) do
-                    if mob:IsA("Model") then
-                        local mobId = getMobId(mob)
-                        if mobId and isAlive(mob) then
-                            targetMob = mob
-                            targetId = mobId
-                            break
+                -- Jika tidak ada target atau target sudah mati, cari target baru
+                if not currentTarget or not isAlive(currentTarget) then
+                    currentTarget = nil
+                    currentTargetId = nil
+                    
+                    -- Cari mob hidup pertama
+                    for _, mob in pairs(mobsFolder:GetChildren()) do
+                        if mob:IsA("Model") then
+                            local mobId = getMobId(mob)
+                            if mobId and isAlive(mob) then
+                                currentTarget = mob
+                                currentTargetId = mobId
+                                break
+                            end
                         end
                     end
                 end
                 
-                if targetMob and targetId then
-                    -- Tween ke model
-                    tweenToModel(targetMob)
+                -- Jika ada target, tween dan serang
+                if currentTarget and currentTargetId then
+                    -- Update status di GUI
+                    if guiElements then
+                        guiElements.targetLabel.Text = "🎯 " .. currentTarget.Name
+                    end
+                    
+                    -- Tween ke target
+                    tweenToModel(currentTarget)
                     
                     -- Serang sampai mati
-                    while AutoMobs and targetMob and targetMob.Parent and isAlive(targetMob) do
-                        hitMob(targetId)
+                    while AutoMobs and currentTarget and isAlive(currentTarget) do
+                        hitMob(currentTargetId)
                         task.wait(CONFIG.AttackSpeed)
                     end
                 end
             end
         end
-        task.wait(0.5)
+        
+        -- Scan setiap 0.5 detik
+        task.wait(CONFIG.ScanDelay)
     end
 end)
 
@@ -272,7 +290,7 @@ screenGui.ResetOnSpawn = false
 screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
 local Main = Instance.new("Frame")
-Main.Size = UDim2.new(0, 300, 0, 450)
+Main.Size = UDim2.new(0, 300, 0, 460)
 Main.Position = UDim2.new(0.5, -150, 0.15, 0)
 Main.BackgroundColor3 = Color3.fromRGB(8, 6, 15)
 Main.BackgroundTransparency = 0.05
@@ -407,7 +425,7 @@ TabRaidCorner.Parent = TabRaid
 
 -- ========== CONTENT MAIN ==========
 local ContentMain = Instance.new("Frame")
-ContentMain.Size = UDim2.new(1, -20, 0, 310)
+ContentMain.Size = UDim2.new(1, -20, 0, 320)
 ContentMain.Position = UDim2.new(0, 10, 0, 95)
 ContentMain.BackgroundTransparency = 1
 ContentMain.Visible = true
@@ -415,7 +433,7 @@ ContentMain.Parent = Main
 
 -- Auto Mobs Card
 local MobsFrame = Instance.new("Frame")
-MobsFrame.Size = UDim2.new(1, 0, 0, 60)
+MobsFrame.Size = UDim2.new(1, 0, 0, 70)
 MobsFrame.BackgroundColor3 = Color3.fromRGB(18, 16, 32)
 MobsFrame.BackgroundTransparency = 0.2
 MobsFrame.BorderSizePixel = 0
@@ -435,14 +453,36 @@ MobsIcon.Parent = MobsFrame
 
 local MobsLabel = Instance.new("TextLabel")
 MobsLabel.Size = UDim2.new(0.5, 0, 0, 20)
-MobsLabel.Position = UDim2.new(0, 55, 0, 20)
+MobsLabel.Position = UDim2.new(0, 55, 0, 12)
 MobsLabel.BackgroundTransparency = 1
 MobsLabel.Text = "Auto Mobs"
 MobsLabel.TextColor3 = Color3.fromRGB(220, 220, 240)
 MobsLabel.Font = Enum.Font.FredokaOne
-MobsLabel.TextSize = 13
+MobsLabel.TextSize = 14
 MobsLabel.TextXAlignment = Enum.TextXAlignment.Left
 MobsLabel.Parent = MobsFrame
+
+local MobsDesc = Instance.new("TextLabel")
+MobsDesc.Size = UDim2.new(0.5, 0, 0, 14)
+MobsDesc.Position = UDim2.new(0, 55, 0, 32)
+MobsDesc.BackgroundTransparency = 1
+MobsDesc.Text = "Scan 0.5 detik | Fokus 1 target"
+MobsDesc.TextColor3 = Color3.fromRGB(150, 150, 200)
+MobsDesc.Font = Enum.Font.Gotham
+MobsDesc.TextSize = 9
+MobsDesc.TextXAlignment = Enum.TextXAlignment.Left
+MobsDesc.Parent = MobsFrame
+
+local targetLabel = Instance.new("TextLabel")
+targetLabel.Size = UDim2.new(0.5, 0, 0, 14)
+targetLabel.Position = UDim2.new(0, 55, 0, 48)
+targetLabel.BackgroundTransparency = 1
+targetLabel.Text = "🎯 Target: -"
+targetLabel.TextColor3 = Color3.fromRGB(255, 200, 100)
+targetLabel.Font = Enum.Font.Gotham
+targetLabel.TextSize = 10
+targetLabel.TextXAlignment = Enum.TextXAlignment.Left
+targetLabel.Parent = MobsFrame
 
 local MobsBtn = Instance.new("TextButton")
 MobsBtn.Size = UDim2.new(0, 65, 0, 32)
@@ -462,7 +502,7 @@ MobsBtnCorner.Parent = MobsBtn
 -- Auto Convert SP Card
 local ConvertFrame = Instance.new("Frame")
 ConvertFrame.Size = UDim2.new(1, 0, 0, 60)
-ConvertFrame.Position = UDim2.new(0, 0, 0, 70)
+ConvertFrame.Position = UDim2.new(0, 0, 0, 80)
 ConvertFrame.BackgroundColor3 = Color3.fromRGB(18, 16, 32)
 ConvertFrame.BackgroundTransparency = 0.2
 ConvertFrame.BorderSizePixel = 0
@@ -508,8 +548,8 @@ ConvertBtnCorner.Parent = ConvertBtn
 
 -- Info Card
 local InfoFrame = Instance.new("Frame")
-InfoFrame.Size = UDim2.new(1, 0, 0, 50)
-InfoFrame.Position = UDim2.new(0, 0, 0, 145)
+InfoFrame.Size = UDim2.new(1, 0, 0, 60)
+InfoFrame.Position = UDim2.new(0, 0, 0, 155)
 InfoFrame.BackgroundColor3 = Color3.fromRGB(18, 16, 32)
 InfoFrame.BackgroundTransparency = 0.2
 InfoFrame.BorderSizePixel = 0
@@ -542,16 +582,27 @@ local InfoDesc = Instance.new("TextLabel")
 InfoDesc.Size = UDim2.new(0.7, 0, 0, 14)
 InfoDesc.Position = UDim2.new(0, 55, 0, 28)
 InfoDesc.BackgroundTransparency = 1
-InfoDesc.Text = "Auto Mobs: Fokus 1 mob sampai mati"
+InfoDesc.Text = "Auto Mobs: Scan semua model di Mobs"
 InfoDesc.TextColor3 = Color3.fromRGB(150, 150, 200)
 InfoDesc.Font = Enum.Font.Gotham
 InfoDesc.TextSize = 9
 InfoDesc.TextXAlignment = Enum.TextXAlignment.Left
 InfoDesc.Parent = InfoFrame
 
--- ========== CONTENT TELEPORT (SPAWN BIASA) ==========
+local InfoDesc2 = Instance.new("TextLabel")
+InfoDesc2.Size = UDim2.new(0.7, 0, 0, 14)
+InfoDesc2.Position = UDim2.new(0, 55, 0, 42)
+InfoDesc2.BackgroundTransparency = 1
+InfoDesc2.Text = "Scan interval: 0.5 detik"
+InfoDesc2.TextColor3 = Color3.fromRGB(150, 150, 200)
+InfoDesc2.Font = Enum.Font.Gotham
+InfoDesc2.TextSize = 9
+InfoDesc2.TextXAlignment = Enum.TextXAlignment.Left
+InfoDesc2.Parent = InfoFrame
+
+-- ========== CONTENT TELEPORT ==========
 local ContentTeleport = Instance.new("ScrollingFrame")
-ContentTeleport.Size = UDim2.new(1, -20, 0, 310)
+ContentTeleport.Size = UDim2.new(1, -20, 0, 320)
 ContentTeleport.Position = UDim2.new(0, 10, 0, 95)
 ContentTeleport.BackgroundTransparency = 1
 ContentTeleport.ScrollBarThickness = 3
@@ -566,7 +617,6 @@ TeleportLayout.Padding = UDim.new(0, 6)
 TeleportLayout.SortOrder = Enum.SortOrder.LayoutOrder
 TeleportLayout.Parent = ContentTeleport
 
--- Buat tombol teleport biasa
 for _, zone in ipairs(zoneList) do
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(1, 0, 0, 40)
@@ -584,7 +634,6 @@ for _, zone in ipairs(zoneList) do
     btnCorner.CornerRadius = UDim.new(0, 6)
     btnCorner.Parent = btn
     
-    -- TP Label
     local tpLabel = Instance.new("TextLabel")
     tpLabel.Size = UDim2.new(0, 45, 1, 0)
     tpLabel.Position = UDim2.new(1, -52, 0, 0)
@@ -603,7 +652,7 @@ end
 
 -- ========== CONTENT RAID ==========
 local ContentRaid = Instance.new("ScrollingFrame")
-ContentRaid.Size = UDim2.new(1, -20, 0, 310)
+ContentRaid.Size = UDim2.new(1, -20, 0, 320)
 ContentRaid.Position = UDim2.new(0, 10, 0, 95)
 ContentRaid.BackgroundTransparency = 1
 ContentRaid.ScrollBarThickness = 3
@@ -618,7 +667,6 @@ RaidLayout.Padding = UDim.new(0, 6)
 RaidLayout.SortOrder = Enum.SortOrder.LayoutOrder
 RaidLayout.Parent = ContentRaid
 
--- Buat tombol teleport RAID (hanya zone yang punya raid)
 for _, zone in ipairs(zoneList) do
     local isRaidZone = false
     for _, rz in pairs(raidZones) do
@@ -645,7 +693,6 @@ for _, zone in ipairs(zoneList) do
         btnCorner.CornerRadius = UDim.new(0, 6)
         btnCorner.Parent = btn
         
-        -- TP Label (Raid)
         local tpLabel = Instance.new("TextLabel")
         tpLabel.Size = UDim2.new(0, 45, 1, 0)
         tpLabel.Position = UDim2.new(1, -52, 0, 0)
@@ -663,9 +710,8 @@ for _, zone in ipairs(zoneList) do
     end
 end
 
--- Info Raid
 local raidInfoFrame = Instance.new("Frame")
-raidInfoFrame.Size = UDim2.new(1, 0, 0, 50)
+raidInfoFrame.Size = UDim2.new(1, 0, 0, 40)
 raidInfoFrame.BackgroundColor3 = Color3.fromRGB(18, 16, 32)
 raidInfoFrame.BackgroundTransparency = 0.2
 raidInfoFrame.BorderSizePixel = 0
@@ -683,6 +729,34 @@ raidInfoLabel.TextColor3 = Color3.fromRGB(255, 150, 100)
 raidInfoLabel.Font = Enum.Font.FredokaOne
 raidInfoLabel.TextSize = 10
 raidInfoLabel.Parent = raidInfoFrame
+
+-- ========== GUI ELEMENTS ==========
+guiElements = {
+    targetLabel = targetLabel
+}
+
+-- Update target label
+task.spawn(function()
+    while true do
+        if guiElements and guiElements.targetLabel and AutoMobs then
+            local mobsFolder = workspace:FindFirstChild("Mobs")
+            if mobsFolder then
+                for _, mob in pairs(mobsFolder:GetChildren()) do
+                    if mob:IsA("Model") then
+                        local humanoid = mob:FindFirstChild("Humanoid")
+                        if humanoid and humanoid.Health > 0 then
+                            guiElements.targetLabel.Text = "🎯 Target: " .. mob.Name
+                            break
+                        end
+                    end
+                end
+            end
+        elseif guiElements and guiElements.targetLabel then
+            guiElements.targetLabel.Text = "🎯 Target: -"
+        end
+        task.wait(0.5)
+    end
+end)
 
 -- ========== TAB FUNCTIONS ==========
 local function switchTab(tab)
@@ -707,7 +781,7 @@ local function switchTab(tab)
         ContentMain.Visible = false
         ContentTeleport.Visible = true
         ContentRaid.Visible = false
-    else -- RAID
+    else
         TabRaid.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
         TabRaid.TextColor3 = Color3.fromRGB(255, 255, 255)
         TabMain.BackgroundColor3 = Color3.fromRGB(40, 40, 65)
@@ -733,6 +807,9 @@ MobsBtn.MouseButton1Click:Connect(function()
     else
         MobsBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
         MobsBtn.Text = "OFF"
+        if guiElements then
+            guiElements.targetLabel.Text = "🎯 Target: -"
+        end
     end
 end)
 
@@ -760,7 +837,7 @@ MinBtn.MouseButton1Click:Connect(function()
         ContentRaid.Visible = false
         MinBtn.Text = "+"
     else
-        Main.Size = UDim2.new(0, 300, 0, 450)
+        Main.Size = UDim2.new(0, 300, 0, 460)
         TabMain.Visible = true
         TabTeleport.Visible = true
         TabRaid.Visible = true
@@ -784,7 +861,10 @@ end)
 print("═══════════════════════════════════════════")
 print("   ZAIXPLOIT | MELEE RNG")
 print("═══════════════════════════════════════════")
-print("✅ Auto Mobs (Fokus 1 mob sampai mati)")
+print("✅ Auto Mobs (Scan 0.5 detik)")
+print("   → Scan semua model di folder Mobs")
+print("   → Fokus 1 target sampai mati")
+print("   → Langsung pindah ke target berikutnya")
 print("✅ Auto Convert SP (Loop 0.03 detik)")
 print("✅ TELEPORT → SPAWNS biasa")
 print("✅ RAID → BossRaidArea")
