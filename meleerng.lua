@@ -1,7 +1,6 @@
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local TweenService = game:GetService("TweenService")
 local VirtualUser = game:GetService("VirtualUser")
 
 -- ========== FITUR ==========
@@ -12,38 +11,39 @@ local instanKillLoaded = false
 
 -- Config
 local CONFIG = {
-    TweenSpeed = 0.3,
-    AttackSpeed = 0.1,
     WaitTime = 60,
+    IdleTime = 2,
     ConvertDelay = 0.03,
-    ConvertAmount = 30
+    ConvertAmount = 1
 }
 
--- ========== ZONE RAID ==========
+-- ========== ZONE RAID (Urutan baru) ==========
 local raidZones = {
+    {name = "Grassland", icon = "🌿", enabled = false, running = false},
     {name = "Desert Biome", icon = "🏜️", enabled = false, running = false},
-    {name = "Forgotten Valley", icon = "🏔️", enabled = false, running = false},
     {name = "Jungle Biome", icon = "🌴", enabled = false, running = false},
-    {name = "Shadow Dungeon", icon = "👻", enabled = false, running = false},
     {name = "Snow Biome", icon = "❄️", enabled = false, running = false},
-    {name = "Volcano Island", icon = "🌋", enabled = false, running = false}
+    {name = "Volcano Island", icon = "🌋", enabled = false, running = false},
+    {name = "Shadow Dungeon", icon = "👻", enabled = false, running = false},
+    {name = "Shadow Realm", icon = "🌑", enabled = false, running = false},
+    {name = "Forgotten Valley", icon = "🏔️", enabled = false, running = false},
+    {name = "Galactic Outpost", icon = "🚀", enabled = false, running = false}
 }
 
 -- ========== SEMUA ZONE UNTUK TELEPORT ==========
 local allZones = {
-    {name = "Desert Biome", icon = "🏜️"},
-    {name = "Forgotten Valley", icon = "🏔️"},
-    {name = "Galactic Outpost", icon = "🚀"},
     {name = "Grassland", icon = "🌿"},
+    {name = "Desert Biome", icon = "🏜️"},
     {name = "Jungle Biome", icon = "🌴"},
+    {name = "Snow Biome", icon = "❄️"},
+    {name = "Volcano Island", icon = "🌋"},
     {name = "Shadow Dungeon", icon = "👻"},
     {name = "Shadow Realm", icon = "🌑"},
-    {name = "Snow Biome", icon = "❄️"},
-    {name = "Volcano Island", icon = "🌋"}
+    {name = "Forgotten Valley", icon = "🏔️"},
+    {name = "Galactic Outpost", icon = "🚀"}
 }
 
 -- ========== REMOTE ==========
-local hitMobRemote = nil
 local convertSPRemote = nil
 
 pcall(function()
@@ -57,10 +57,6 @@ pcall(function()
                 if NW then
                     local RemotesFolder = NW:FindFirstChild("_remotes")
                     if RemotesFolder then
-                        local hitRemote = RemotesFolder:FindFirstChild("HitMob")
-                        if hitRemote then
-                            hitMobRemote = hitRemote:FindFirstChild("RemoteEvent") or hitRemote:FindFirstChild("RemoteFunction")
-                        end
                         local convertRemote = RemotesFolder:FindFirstChild("ConvertMana")
                         if convertRemote then
                             convertSPRemote = convertRemote:FindFirstChild("RemoteFunction") or convertRemote:FindFirstChild("RemoteEvent")
@@ -72,10 +68,9 @@ pcall(function()
     end
 end)
 
-if not hitMobRemote then
+if not convertSPRemote then
     local Remotes = ReplicatedStorage:FindFirstChild("Remotes")
     if Remotes then
-        hitMobRemote = Remotes:FindFirstChild("HitMob")
         convertSPRemote = Remotes:FindFirstChild("ConvertMana")
     end
 end
@@ -138,87 +133,7 @@ local function teleportToRaid(zoneName)
     return true
 end
 
--- ========== FUNGSI RAID ==========
-local function getMobId(mob)
-    local attrs = mob:GetAttributes()
-    if attrs.ID then return attrs.ID end
-    if attrs.Id then return attrs.Id end
-    return nil
-end
-
-local function getMobHp(mob)
-    local humanoid = mob:FindFirstChild("Humanoid")
-    if humanoid then return humanoid.Health end
-    return 0
-end
-
-local function tweenToModel(model)
-    local char = LocalPlayer.Character
-    if not char then return false end
-    local rootPart = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Head")
-    if not rootPart then return false end
-    local targetPart = model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("Head") or model:FindFirstChildWhichIsA("BasePart")
-    if not targetPart then return false end
-    local targetPos = targetPart.Position + Vector3.new(2, 0, 2)
-    local tween = TweenService:Create(rootPart, TweenInfo.new(CONFIG.TweenSpeed, Enum.EasingStyle.Quad), {CFrame = CFrame.new(targetPos)})
-    tween:Play()
-    tween.Completed:Wait()
-    return true
-end
-
-local function hitMob(mobId)
-    if not mobId or not hitMobRemote then return end
-    pcall(function()
-        if hitMobRemote.ClassName == "RemoteEvent" then
-            hitMobRemote:FireServer(mobId)
-        else
-            hitMobRemote:FireServer(unpack({{{mobId, 0, nil}}}))
-        end
-    end)
-end
-
-local function isAlive(model)
-    if not model or not model.Parent then return false end
-    local humanoid = model:FindFirstChild("Humanoid")
-    if humanoid then return humanoid.Health > 0 end
-    return true
-end
-
-local function hasAliveMobs()
-    local mobsFolder = workspace:FindFirstChild("Mobs")
-    if not mobsFolder then return false end
-    for _, mob in pairs(mobsFolder:GetChildren()) do
-        if mob:IsA("Model") then
-            local mobId = getMobId(mob)
-            if mobId and isAlive(mob) then
-                return true
-            end
-        end
-    end
-    return false
-end
-
-local function getMobWithMostHp()
-    local mobsFolder = workspace:FindFirstChild("Mobs")
-    if not mobsFolder then return nil end
-    local bestMob = nil
-    local bestHp = 0
-    for _, mob in pairs(mobsFolder:GetChildren()) do
-        if mob:IsA("Model") then
-            local mobId = getMobId(mob)
-            if mobId and isAlive(mob) then
-                local hp = getMobHp(mob)
-                if hp > bestHp then
-                    bestHp = hp
-                    bestMob = mob
-                end
-            end
-        end
-    end
-    return bestMob, bestHp
-end
-
--- ========== LOOP RAID UNTUK SATU ZONE ==========
+-- ========== LOOP RAID (60s + idle 2s, tanpa kill) ==========
 local function startRaidForZone(zone)
     if zone.running then return end
     zone.running = true
@@ -227,6 +142,7 @@ local function startRaidForZone(zone)
         while zone.enabled do
             -- Teleport ke raid zone
             teleportToRaid(zone.name)
+            print("📍 Teleport ke " .. zone.name .. " [RAID]")
             
             -- Tunggu 60 detik
             for i = CONFIG.WaitTime, 1, -1 do
@@ -235,19 +151,8 @@ local function startRaidForZone(zone)
             end
             if not zone.enabled then break end
             
-            -- Scan dan serang HP terbanyak
-            while zone.enabled and hasAliveMobs() do
-                local target, targetHp = getMobWithMostHp()
-                if target then
-                    local mobId = getMobId(target)
-                    tweenToModel(target)
-                    while zone.enabled and target and target.Parent and isAlive(target) do
-                        hitMob(mobId)
-                        task.wait(CONFIG.AttackSpeed)
-                    end
-                end
-                task.wait(0.5)
-            end
+            -- Jeda 2 detik
+            task.wait(CONFIG.IdleTime)
         end
         zone.running = false
     end)
@@ -290,6 +195,7 @@ end
 
 -- ========== ANTI AFK ==========
 LocalPlayer.Idled:Connect(function()
+    local VirtualUser = game:GetService("VirtualUser")
     VirtualUser:Button2Down(Vector2.new(0, 0))
     task.wait(1)
     VirtualUser:Button2Up(Vector2.new(0, 0))
@@ -302,7 +208,7 @@ screenGui.ResetOnSpawn = false
 screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
 local Main = Instance.new("Frame")
-Main.Size = UDim2.new(0, 280, 0, 380)
+Main.Size = UDim2.new(0, 280, 0, 420)
 Main.Position = UDim2.new(0.5, -140, 0.15, 0)
 Main.BackgroundColor3 = Color3.fromRGB(8, 6, 15)
 Main.BackgroundTransparency = 0.05
@@ -437,7 +343,7 @@ TabMenuCorner.Parent = TabMenu
 
 -- ========== CONTENT RAID ==========
 local ContentRaid = Instance.new("ScrollingFrame")
-ContentRaid.Size = UDim2.new(1, -20, 0, 280)
+ContentRaid.Size = UDim2.new(1, -20, 0, 310)
 ContentRaid.Position = UDim2.new(0, 10, 0, 90)
 ContentRaid.BackgroundTransparency = 1
 ContentRaid.ScrollBarThickness = 3
@@ -455,7 +361,7 @@ RaidLayout.Parent = ContentRaid
 local timerInfo = Instance.new("TextLabel")
 timerInfo.Size = UDim2.new(1, 0, 0, 25)
 timerInfo.BackgroundTransparency = 1
-timerInfo.Text = "⏱️ Timer: 60 detik"
+timerInfo.Text = "⏱️ Timer: 60s | Idle: 2s"
 timerInfo.TextColor3 = Color3.fromRGB(100, 200, 255)
 timerInfo.Font = Enum.Font.Gotham
 timerInfo.TextSize = 10
@@ -512,7 +418,7 @@ end
 
 -- ========== CONTENT TELEPORT ==========
 local ContentTeleport = Instance.new("ScrollingFrame")
-ContentTeleport.Size = UDim2.new(1, -20, 0, 280)
+ContentTeleport.Size = UDim2.new(1, -20, 0, 310)
 ContentTeleport.Position = UDim2.new(0, 10, 0, 90)
 ContentTeleport.BackgroundTransparency = 1
 ContentTeleport.ScrollBarThickness = 3
@@ -564,7 +470,7 @@ end
 
 -- ========== CONTENT MENU ==========
 local ContentMenu = Instance.new("Frame")
-ContentMenu.Size = UDim2.new(1, -20, 0, 280)
+ContentMenu.Size = UDim2.new(1, -20, 0, 310)
 ContentMenu.Position = UDim2.new(0, 10, 0, 90)
 ContentMenu.BackgroundTransparency = 1
 ContentMenu.Visible = false
@@ -726,7 +632,7 @@ MinBtn.MouseButton1Click:Connect(function()
         ContentMenu.Visible = false
         MinBtn.Text = "+"
     else
-        Main.Size = UDim2.new(0, 280, 0, 380)
+        Main.Size = UDim2.new(0, 280, 0, 420)
         TabRaid.Visible = true
         TabTeleport.Visible = true
         TabMenu.Visible = true
@@ -752,7 +658,8 @@ end)
 print("═══════════════════════════════════════════")
 print("   ZAIXPLOIT | MELEE RNG")
 print("═══════════════════════════════════════════")
-print("⚔️ RAID - Timer 60 detik")
+print("⚔️ RAID - 9 Zone")
+print("   Urutan: Grassland → Desert → Jungle → Snow → Volcano → Shadow Dungeon → Shadow Realm → Forgotten Valley → Galactic")
 print("📍 TELEPORT - Ke SPAWNS")
 print("📋 MENU - Instan Kill & Convert SP")
 print("═══════════════════════════════════════════")
