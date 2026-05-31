@@ -5,12 +5,8 @@ local TweenService = game:GetService("TweenService")
 local VirtualUser = game:GetService("VirtualUser")
 
 -- ========== FITUR ==========
-local AutoRaid = false
 local ConvertSP = false
 local isMinimized = false
-local selectedZone = "Desert Biome"
-local killCount = 0
-local instanKillLoaded = false
 
 -- Config
 local CONFIG = {
@@ -21,14 +17,14 @@ local CONFIG = {
     ConvertAmount = 30
 }
 
--- ========== DATA ZONE RAID ==========
+-- ========== ZONE RAID ==========
 local raidZones = {
-    {name = "Desert Biome", icon = "🏜️"},
-    {name = "Forgotten Valley", icon = "🏔️"},
-    {name = "Jungle Biome", icon = "🌴"},
-    {name = "Shadow Dungeon", icon = "👻"},
-    {name = "Snow Biome", icon = "❄️"},
-    {name = "Volcano Island", icon = "🌋"}
+    {name = "Desert Biome", icon = "🏜️", enabled = false, running = false},
+    {name = "Forgotten Valley", icon = "🏔️", enabled = false, running = false},
+    {name = "Jungle Biome", icon = "🌴", enabled = false, running = false},
+    {name = "Shadow Dungeon", icon = "👻", enabled = false, running = false},
+    {name = "Snow Biome", icon = "❄️", enabled = false, running = false},
+    {name = "Volcano Island", icon = "🌋", enabled = false, running = false}
 }
 
 -- ========== REMOTE ==========
@@ -69,7 +65,7 @@ if not hitMobRemote then
     end
 end
 
--- ========== FUNGSI AUTO RAID ==========
+-- ========== FUNGSI RAID ==========
 local function teleportToRaid(zoneName)
     local areas = workspace:FindFirstChild("Areas")
     if not areas then return false end
@@ -179,55 +175,40 @@ local function getMobWithMostHp()
     return bestMob, bestHp
 end
 
--- Loop Auto RAID
-task.spawn(function()
-    while true do
-        if AutoRaid then
-            -- Teleport
-            teleportToRaid(selectedZone)
+-- ========== LOOP RAID UNTUK SATU ZONE ==========
+local function startRaidForZone(zone)
+    if zone.running then return end
+    zone.running = true
+    
+    task.spawn(function()
+        while zone.enabled do
+            -- Teleport ke zone
+            teleportToRaid(zone.name)
             
             -- Tunggu 20 detik
             for i = CONFIG.WaitTime, 1, -1 do
-                if not AutoRaid then break end
-                if guiElements and guiElements.timerLabel then
-                    guiElements.timerLabel.Text = "⏱️ " .. i .. "s"
-                end
+                if not zone.enabled then break end
                 task.wait(1)
             end
-            if not AutoRaid then break end
+            if not zone.enabled then break end
             
-            -- Serang HP terbanyak
-            while AutoRaid and hasAliveMobs() do
+            -- Scan dan serang HP terbanyak
+            while zone.enabled and hasAliveMobs() do
                 local target, targetHp = getMobWithMostHp()
                 if target then
                     local mobId = getMobId(target)
-                    local mobName = target.Name
-                    
-                    if guiElements then
-                        guiElements.targetLabel.Text = "🎯 " .. mobName .. " (" .. targetHp .. ")"
-                    end
-                    
                     tweenToModel(target)
-                    
-                    while AutoRaid and target and target.Parent and isAlive(target) do
+                    while zone.enabled and target and target.Parent and isAlive(target) do
                         hitMob(mobId)
-                        killCount = killCount + 1
-                        if guiElements then
-                            guiElements.killLabel.Text = "💀 " .. killCount
-                        end
                         task.wait(CONFIG.AttackSpeed)
                     end
                 end
                 task.wait(0.5)
             end
-            
-            if AutoRaid then
-                task.wait(2)
-            end
         end
-        task.wait(0.5)
-    end
-end)
+        zone.running = false
+    end)
+end
 
 -- ========== AUTO CONVERT SP ==========
 task.spawn(function()
@@ -245,11 +226,8 @@ task.spawn(function()
     end
 end)
 
--- ========== INSTAN KILL (SEKALI JALAN) ==========
-local function loadInstanKill()
-    if instanKillLoaded then return end
-    instanKillLoaded = true
-    
+-- ========== INSTAN KILL ==========
+local function runInstanKill()
     local url = "https://raw.githubusercontent.com/lolwtfpro/booyah/refs/heads/main/untitledmeleerngkill.lua"
     local success, result = pcall(function()
         return game:HttpGet(url, true)
@@ -259,10 +237,10 @@ local function loadInstanKill()
         local func, err = loadstring(result)
         if func then
             pcall(func)
+            print("💀 Instan Kill: RUNNING")
             if guiElements and guiElements.instanKillStatus then
-                guiElements.instanKillStatus.Text = "✅ ACTIVE"
+                guiElements.instanKillStatus.Text = "✅"
             end
-            print("💀 Instan Kill: LOADED")
         end
     end
 end
@@ -281,8 +259,8 @@ screenGui.ResetOnSpawn = false
 screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
 local Main = Instance.new("Frame")
-Main.Size = UDim2.new(0, 260, 0, 200)
-Main.Position = UDim2.new(0.5, -130, 0.3, 0)
+Main.Size = UDim2.new(0, 260, 0, 260)
+Main.Position = UDim2.new(0.5, -130, 0.2, 0)
 Main.BackgroundColor3 = Color3.fromRGB(8, 6, 15)
 Main.BackgroundTransparency = 0.05
 Main.BorderSizePixel = 0
@@ -369,320 +347,191 @@ CloseCorner.CornerRadius = UDim.new(0, 4)
 CloseCorner.Parent = CloseBtn
 
 -- Content
-local Content = Instance.new("Frame")
+local Content = Instance.new("ScrollingFrame")
 Content.Size = UDim2.new(1, -16, 1, -45)
 Content.Position = UDim2.new(0, 8, 0, 40)
 Content.BackgroundTransparency = 1
+Content.ScrollBarThickness = 3
+Content.CanvasSize = UDim2.new(0, 0, 0, 0)
+Content.AutomaticCanvasSize = Enum.AutomaticSize.Y
 Content.Parent = Main
 
--- ========== AUTO RAID TOGGLE ==========
-local RaidFrame = Instance.new("Frame")
-RaidFrame.Size = UDim2.new(1, 0, 0, 30)
-RaidFrame.BackgroundTransparency = 1
-RaidFrame.Parent = Content
+local Layout = Instance.new("UIListLayout")
+Layout.Padding = UDim.new(0, 5)
+Layout.SortOrder = Enum.SortOrder.LayoutOrder
+Layout.Parent = Content
 
-local RaidLabel = Instance.new("TextLabel")
-RaidLabel.Size = UDim2.new(0.6, 0, 1, 0)
-RaidLabel.BackgroundTransparency = 1
-RaidLabel.Text = "⚔️ AUTO RAID"
-RaidLabel.TextColor3 = Color3.fromRGB(220, 220, 240)
-RaidLabel.Font = Enum.Font.FredokaOne
-RaidLabel.TextSize = 12
-RaidLabel.TextXAlignment = Enum.TextXAlignment.Left
-RaidLabel.Parent = RaidFrame
+-- ========== MEMBUAT TOGGLE ZONE ==========
+local zoneToggles = {}
+local zoneStatusLabels = {}
 
-local RaidToggle = Instance.new("TextButton")
-RaidToggle.Size = UDim2.new(0, 50, 0, 24)
-RaidToggle.Position = UDim2.new(1, -55, 0.5, -12)
-RaidToggle.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
-RaidToggle.Text = "OFF"
-RaidToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
-RaidToggle.Font = Enum.Font.GothamBold
-RaidToggle.TextSize = 11
-RaidToggle.BorderSizePixel = 0
-RaidToggle.Parent = RaidFrame
-
-local RaidToggleCorner = Instance.new("UICorner")
-RaidToggleCorner.CornerRadius = UDim.new(0, 5)
-RaidToggleCorner.Parent = RaidToggle
-
--- ========== DROPDOWN ZONE ==========
-local ZoneFrame = Instance.new("Frame")
-ZoneFrame.Size = UDim2.new(1, 0, 0, 30)
-ZoneFrame.Position = UDim2.new(0, 0, 0, 35)
-ZoneFrame.BackgroundTransparency = 1
-ZoneFrame.Parent = Content
-
-local ZoneLabel = Instance.new("TextLabel")
-ZoneLabel.Size = UDim2.new(0.3, 0, 1, 0)
-ZoneLabel.BackgroundTransparency = 1
-ZoneLabel.Text = "📍"
-ZoneLabel.TextColor3 = Color3.fromRGB(150, 150, 200)
-ZoneLabel.Font = Enum.Font.FredokaOne
-ZoneLabel.TextSize = 12
-ZoneLabel.TextXAlignment = Enum.TextXAlignment.Left
-ZoneLabel.Parent = ZoneFrame
-
-local ZoneDropdown = Instance.new("TextButton")
-ZoneDropdown.Size = UDim2.new(0, 160, 0, 26)
-ZoneDropdown.Position = UDim2.new(0.3, 0, 0.5, -13)
-ZoneDropdown.BackgroundColor3 = Color3.fromRGB(30, 30, 50)
-ZoneDropdown.Text = "🏜️ Desert Biome"
-ZoneDropdown.TextColor3 = Color3.fromRGB(255, 255, 255)
-ZoneDropdown.Font = Enum.Font.Gotham
-ZoneDropdown.TextSize = 10
-ZoneDropdown.BorderSizePixel = 0
-ZoneDropdown.Parent = ZoneFrame
-
-local ZoneDropdownCorner = Instance.new("UICorner")
-ZoneDropdownCorner.CornerRadius = UDim.new(0, 5)
-ZoneDropdownCorner.Parent = ZoneDropdown
-
--- Dropdown menu
-local dropdownOpen = false
-local dropdownFrame = nil
-
-local function closeDropdown()
-    if dropdownFrame then
-        dropdownFrame:Destroy()
-        dropdownFrame = nil
-    end
-    dropdownOpen = false
+for _, zone in ipairs(raidZones) do
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, 0, 0, 28)
+    frame.BackgroundTransparency = 1
+    frame.Parent = Content
+    
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0.6, 0, 1, 0)
+    label.BackgroundTransparency = 1
+    label.Text = zone.icon .. " " .. zone.name
+    label.TextColor3 = Color3.fromRGB(220, 220, 240)
+    label.Font = Enum.Font.FredokaOne
+    label.TextSize = 11
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = frame
+    
+    local toggle = Instance.new("TextButton")
+    toggle.Size = UDim2.new(0, 50, 0, 22)
+    toggle.Position = UDim2.new(1, -55, 0.5, -11)
+    toggle.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+    toggle.Text = "OFF"
+    toggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+    toggle.Font = Enum.Font.GothamBold
+    toggle.TextSize = 10
+    toggle.BorderSizePixel = 0
+    toggle.Parent = frame
+    
+    local toggleCorner = Instance.new("UICorner")
+    toggleCorner.CornerRadius = UDim.new(0, 4)
+    toggleCorner.Parent = toggle
+    
+    local statusLabel = Instance.new("TextLabel")
+    statusLabel.Size = UDim2.new(0, 30, 0, 14)
+    statusLabel.Position = UDim2.new(1, -88, 0.5, -7)
+    statusLabel.BackgroundTransparency = 1
+    statusLabel.Text = ""
+    statusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+    statusLabel.Font = Enum.Font.Gotham
+    statusLabel.TextSize = 8
+    statusLabel.Parent = frame
+    
+    zoneToggles[zone.name] = toggle
+    zoneStatusLabels[zone.name] = statusLabel
+    
+    toggle.MouseButton1Click:Connect(function()
+        zone.enabled = not zone.enabled
+        if zone.enabled then
+            toggle.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+            toggle.Text = "ON"
+            statusLabel.Text = "▶"
+            startRaidForZone(zone)
+        else
+            toggle.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+            toggle.Text = "OFF"
+            statusLabel.Text = ""
+        end
+    end)
 end
 
-local function openDropdown()
-    closeDropdown()
-    dropdownOpen = true
-    
-    dropdownFrame = Instance.new("Frame")
-    dropdownFrame.Size = UDim2.new(0, 160, 0, 150)
-    dropdownFrame.Position = UDim2.new(0.3, 0, 0.5, 16)
-    dropdownFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 45)
-    dropdownFrame.BackgroundTransparency = 0.1
-    dropdownFrame.BorderSizePixel = 0
-    dropdownFrame.Parent = ZoneFrame
-    
-    local dropdownCorner = Instance.new("UICorner")
-    dropdownCorner.CornerRadius = UDim.new(0, 5)
-    dropdownCorner.Parent = dropdownFrame
-    
-    local dropdownStroke = Instance.new("UIStroke")
-    dropdownStroke.Color = Color3.fromRGB(0, 150, 255)
-    dropdownStroke.Thickness = 1
-    dropdownStroke.Parent = dropdownFrame
-    
-    local layout = Instance.new("UIListLayout")
-    layout.Padding = UDim.new(0, 2)
-    layout.Parent = dropdownFrame
-    
-    for _, zone in pairs(raidZones) do
-        local btn = Instance.new("TextButton")
-        btn.Size = UDim2.new(1, 0, 0, 24)
-        btn.BackgroundColor3 = Color3.fromRGB(30, 30, 50)
-        btn.Text = zone.icon .. " " .. zone.name
-        btn.TextColor3 = Color3.fromRGB(220, 220, 240)
-        btn.Font = Enum.Font.Gotham
-        btn.TextSize = 9
-        btn.BorderSizePixel = 0
-        btn.Parent = dropdownFrame
-        
-        local btnCorner = Instance.new("UICorner")
-        btnCorner.CornerRadius = UDim.new(0, 4)
-        btnCorner.Parent = btn
-        
-        btn.MouseButton1Click:Connect(function()
-            selectedZone = zone.name
-            ZoneDropdown.Text = zone.icon .. " " .. zone.name
-            closeDropdown()
-        end)
-    end
-end
+-- Spacer
+local spacer = Instance.new("Frame")
+spacer.Size = UDim2.new(1, 0, 0, 10)
+spacer.BackgroundTransparency = 1
+spacer.Parent = Content
 
-ZoneDropdown.MouseButton1Click:Connect(function()
-    if dropdownOpen then
-        closeDropdown()
-    else
-        openDropdown()
-    end
-end)
-
--- ========== INSTAN KILL (SEKALI JALAN) ==========
-local KillFrame = Instance.new("Frame")
-KillFrame.Size = UDim2.new(1, 0, 0, 30)
-KillFrame.Position = UDim2.new(0, 0, 0, 70)
-KillFrame.BackgroundTransparency = 1
-KillFrame.Parent = Content
-
-local KillLabel = Instance.new("TextLabel")
-KillLabel.Size = UDim2.new(0.6, 0, 1, 0)
-KillLabel.BackgroundTransparency = 1
-KillLabel.Text = "💀 INSTAN KILL"
-KillLabel.TextColor3 = Color3.fromRGB(220, 220, 240)
-KillLabel.Font = Enum.Font.FredokaOne
-KillLabel.TextSize = 12
-KillLabel.TextXAlignment = Enum.TextXAlignment.Left
-KillLabel.Parent = KillFrame
-
-local KillBtn = Instance.new("TextButton")
-KillBtn.Size = UDim2.new(0, 50, 0, 24)
-KillBtn.Position = UDim2.new(1, -55, 0.5, -12)
-KillBtn.BackgroundColor3 = Color3.fromRGB(50, 150, 255)
-KillBtn.Text = "RUN"
-KillBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-KillBtn.Font = Enum.Font.GothamBold
-KillBtn.TextSize = 11
-KillBtn.BorderSizePixel = 0
-KillBtn.Parent = KillFrame
-
-local KillBtnCorner = Instance.new("UICorner")
-KillBtnCorner.CornerRadius = UDim.new(0, 5)
-KillBtnCorner.Parent = KillBtn
-
--- Status Instan Kill (small)
-local KillStatus = Instance.new("TextLabel")
-KillStatus.Size = UDim2.new(0, 40, 0, 14)
-KillStatus.Position = UDim2.new(1, -100, 0.5, -7)
-KillStatus.BackgroundTransparency = 1
-KillStatus.Text = ""
-KillStatus.TextColor3 = Color3.fromRGB(100, 255, 100)
-KillStatus.Font = Enum.Font.Gotham
-KillStatus.TextSize = 8
-KillStatus.Parent = KillFrame
-
--- ========== CONVERT SP TOGGLE ==========
-local ConvertFrame = Instance.new("Frame")
-ConvertFrame.Size = UDim2.new(1, 0, 0, 30)
-ConvertFrame.Position = UDim2.new(0, 0, 0, 105)
-ConvertFrame.BackgroundTransparency = 1
-ConvertFrame.Parent = Content
-
-local ConvertLabel = Instance.new("TextLabel")
-ConvertLabel.Size = UDim2.new(0.6, 0, 1, 0)
-ConvertLabel.BackgroundTransparency = 1
-ConvertLabel.Text = "✨ CONVERT SP"
-ConvertLabel.TextColor3 = Color3.fromRGB(220, 220, 240)
-ConvertLabel.Font = Enum.Font.FredokaOne
-ConvertLabel.TextSize = 12
-ConvertLabel.TextXAlignment = Enum.TextXAlignment.Left
-ConvertLabel.Parent = ConvertFrame
-
-local ConvertToggle = Instance.new("TextButton")
-ConvertToggle.Size = UDim2.new(0, 50, 0, 24)
-ConvertToggle.Position = UDim2.new(1, -55, 0.5, -12)
-ConvertToggle.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
-ConvertToggle.Text = "OFF"
-ConvertToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
-ConvertToggle.Font = Enum.Font.GothamBold
-ConvertToggle.TextSize = 11
-ConvertToggle.BorderSizePixel = 0
-ConvertToggle.Parent = ConvertFrame
-
-local ConvertToggleCorner = Instance.new("UICorner")
-ConvertToggleCorner.CornerRadius = UDim.new(0, 5)
-ConvertToggleCorner.Parent = ConvertToggle
-
--- ========== STATUS BAR (kecil) ==========
-local StatusFrame = Instance.new("Frame")
-StatusFrame.Size = UDim2.new(1, 0, 0, 24)
-StatusFrame.Position = UDim2.new(0, 0, 0, 140)
-StatusFrame.BackgroundColor3 = Color3.fromRGB(18, 16, 32)
-StatusFrame.BackgroundTransparency = 0.3
-StatusFrame.BorderSizePixel = 0
-StatusFrame.Parent = Content
-
-local StatusCorner = Instance.new("UICorner")
-StatusCorner.CornerRadius = UDim.new(0, 5)
-StatusCorner.Parent = StatusFrame
-
-local timerLabel = Instance.new("TextLabel")
-timerLabel.Size = UDim2.new(0.33, 0, 1, 0)
-timerLabel.BackgroundTransparency = 1
-timerLabel.Text = "⏱️ --"
-timerLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-timerLabel.Font = Enum.Font.Gotham
-timerLabel.TextSize = 9
-timerLabel.Parent = StatusFrame
-
-local targetLabel = Instance.new("TextLabel")
-targetLabel.Size = UDim2.new(0.4, 0, 1, 0)
-targetLabel.Position = UDim2.new(0.33, 0, 0, 0)
-targetLabel.BackgroundTransparency = 1
-targetLabel.Text = "🎯 --"
-targetLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-targetLabel.Font = Enum.Font.Gotham
-targetLabel.TextSize = 9
-targetLabel.Parent = StatusFrame
+-- ========== INSTAN KILL ==========
+local killFrame = Instance.new("Frame")
+killFrame.Size = UDim2.new(1, 0, 0, 28)
+killFrame.BackgroundTransparency = 1
+killFrame.Parent = Content
 
 local killLabel = Instance.new("TextLabel")
-killLabel.Size = UDim2.new(0.27, 0, 1, 0)
-killLabel.Position = UDim2.new(0.73, 0, 0, 0)
+killLabel.Size = UDim2.new(0.6, 0, 1, 0)
 killLabel.BackgroundTransparency = 1
-killLabel.Text = "💀 0"
-killLabel.TextColor3 = Color3.fromRGB(255, 200, 100)
-killLabel.Font = Enum.Font.Gotham
-killLabel.TextSize = 9
-killLabel.Parent = StatusFrame
+killLabel.Text = "💀 INSTAN KILL"
+killLabel.TextColor3 = Color3.fromRGB(220, 220, 240)
+killLabel.Font = Enum.Font.FredokaOne
+killLabel.TextSize = 11
+killLabel.TextXAlignment = Enum.TextXAlignment.Left
+killLabel.Parent = killFrame
+
+local killBtn = Instance.new("TextButton")
+killBtn.Size = UDim2.new(0, 50, 0, 22)
+killBtn.Position = UDim2.new(1, -55, 0.5, -11)
+killBtn.BackgroundColor3 = Color3.fromRGB(50, 150, 255)
+killBtn.Text = "RUN"
+killBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+killBtn.Font = Enum.Font.GothamBold
+killBtn.TextSize = 10
+killBtn.BorderSizePixel = 0
+killBtn.Parent = killFrame
+
+local killBtnCorner = Instance.new("UICorner")
+killBtnCorner.CornerRadius = UDim.new(0, 4)
+killBtnCorner.Parent = killBtn
+
+local killStatus = Instance.new("TextLabel")
+killStatus.Size = UDim2.new(0, 30, 0, 14)
+killStatus.Position = UDim2.new(1, -88, 0.5, -7)
+killStatus.BackgroundTransparency = 1
+killStatus.Text = ""
+killStatus.TextColor3 = Color3.fromRGB(100, 255, 100)
+killStatus.Font = Enum.Font.Gotham
+killStatus.TextSize = 8
+killStatus.Parent = killFrame
+
+-- ========== CONVERT SP ==========
+local convertFrame = Instance.new("Frame")
+convertFrame.Size = UDim2.new(1, 0, 0, 28)
+convertFrame.BackgroundTransparency = 1
+convertFrame.Parent = Content
+
+local convertLabel = Instance.new("TextLabel")
+convertLabel.Size = UDim2.new(0.6, 0, 1, 0)
+convertLabel.BackgroundTransparency = 1
+convertLabel.Text = "✨ CONVERT SP"
+convertLabel.TextColor3 = Color3.fromRGB(220, 220, 240)
+convertLabel.Font = Enum.Font.FredokaOne
+convertLabel.TextSize = 11
+convertLabel.TextXAlignment = Enum.TextXAlignment.Left
+convertLabel.Parent = convertFrame
+
+local convertToggle = Instance.new("TextButton")
+convertToggle.Size = UDim2.new(0, 50, 0, 22)
+convertToggle.Position = UDim2.new(1, -55, 0.5, -11)
+convertToggle.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+convertToggle.Text = "OFF"
+convertToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+convertToggle.Font = Enum.Font.GothamBold
+convertToggle.TextSize = 10
+convertToggle.BorderSizePixel = 0
+convertToggle.Parent = convertFrame
+
+local convertToggleCorner = Instance.new("UICorner")
+convertToggleCorner.CornerRadius = UDim.new(0, 4)
+convertToggleCorner.Parent = convertToggle
 
 -- ========== GUI ELEMENTS ==========
 guiElements = {
-    timerLabel = timerLabel,
-    targetLabel = targetLabel,
-    killLabel = killLabel,
-    instanKillStatus = KillStatus
+    instanKillStatus = killStatus
 }
 
--- Update kill counter
-task.spawn(function()
-    while true do
-        if guiElements and guiElements.killLabel then
-            guiElements.killLabel.Text = "💀 " .. killCount
-        end
-        task.wait(0.3)
-    end
-end)
-
--- ========== TOGGLE FUNCTIONS ==========
-RaidToggle.MouseButton1Click:Connect(function()
-    AutoRaid = not AutoRaid
-    if AutoRaid then
-        RaidToggle.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
-        RaidToggle.Text = "ON"
-        killCount = 0
-        killLabel.Text = "💀 0"
-    else
-        RaidToggle.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
-        RaidToggle.Text = "OFF"
-        timerLabel.Text = "⏱️ --"
-        targetLabel.Text = "🎯 --"
-    end
-end)
-
-KillBtn.MouseButton1Click:Connect(function()
+-- ========== FUNGSI ==========
+killBtn.MouseButton1Click:Connect(function()
     if not instanKillLoaded then
-        KillBtn.BackgroundColor3 = Color3.fromRGB(100, 200, 100)
-        KillBtn.Text = "RUN"
-        KillStatus.Text = "LOADING..."
+        instanKillLoaded = true
+        killStatus.Text = "⏳"
         task.spawn(function()
-            loadInstanKill()
-            KillStatus.Text = "✅"
+            runInstanKill()
+            killStatus.Text = "✅"
             task.wait(2)
-            KillStatus.Text = ""
+            killStatus.Text = ""
         end)
     end
 end)
 
-ConvertToggle.MouseButton1Click:Connect(function()
+convertToggle.MouseButton1Click:Connect(function()
     ConvertSP = not ConvertSP
     if ConvertSP then
-        ConvertToggle.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
-        ConvertToggle.Text = "ON"
+        convertToggle.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+        convertToggle.Text = "ON"
     else
-        ConvertToggle.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
-        ConvertToggle.Text = "OFF"
+        convertToggle.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+        convertToggle.Text = "OFF"
     end
 end)
 
--- Minimize
 MinBtn.MouseButton1Click:Connect(function()
     isMinimized = not isMinimized
     if isMinimized then
@@ -690,14 +539,16 @@ MinBtn.MouseButton1Click:Connect(function()
         Content.Visible = false
         MinBtn.Text = "+"
     else
-        Main.Size = UDim2.new(0, 260, 0, 200)
+        Main.Size = UDim2.new(0, 260, 0, 260)
         Content.Visible = true
         MinBtn.Text = "−"
     end
 end)
 
 CloseBtn.MouseButton1Click:Connect(function()
-    AutoRaid = false
+    for _, zone in pairs(raidZones) do
+        zone.enabled = false
+    end
     ConvertSP = false
     screenGui:Destroy()
 end)
@@ -705,7 +556,11 @@ end)
 print("═══════════════════════════════════════════")
 print("   ZAIXPLOIT | MELEE RNG")
 print("═══════════════════════════════════════════")
-print("⚔️ AUTO RAID (Pilih zone, loop 20s)")
-print("💀 INSTAN KILL (Tekan RUN, sekali jalan)")
-print("✨ CONVERT SP (Toggle ON/OFF)")
+print("✅ AUTO RAID (Toggle per zone)")
+print("   → Teleport ke BossRaidArea")
+print("   → Tunggu 20 detik")
+print("   → Scan HP terbanyak → Kill")
+print("   → Loop terus ke zone yang sama")
+print("✅ INSTAN KILL (Tombol RUN)")
+print("✅ CONVERT SP (Toggle ON/OFF)")
 print("═══════════════════════════════════════════")
